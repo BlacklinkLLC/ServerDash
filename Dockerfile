@@ -31,10 +31,10 @@ ENV SERVERDASH_LISTEN_ADDR=:8080 \
     SERVERDASH_API_URL=http://127.0.0.1:8080 \
     SERVERDASH_DOCKER_HOST=unix:///var/run/docker.sock \
     SERVERDASH_PUBLIC_HOST=nova.blacklink.net \
-    PORT=3000
+    PORT=9900
 
 # Only the web UI's port needs to be published; the Go API is reached
 # internally over 127.0.0.1 by the Node process.
-EXPOSE 3000
+EXPOSE 9900
 
 CMD ["supervisord", "-c", "/etc/supervisord.conf", "-n"]

@@ -21,7 +21,7 @@ cp .env.example .env   # adjust SERVERDASH_PUBLIC_HOST, port, etc.
 docker compose up -d --build
 ```
 
-This builds the image and starts ServerDash on `http://localhost:3000` (or
+This builds the image and starts ServerDash on `http://localhost:9900` (or
 `SERVERDASH_PORT` from `.env`), reverse-proxy it at **nova.blacklink.net** for the
 real deployment. `docker-compose.yml` mounts the Docker socket (swap for Podman's
 socket + `SERVERDASH_DOCKER_HOST` to manage Podman instead), and bind-mounts the

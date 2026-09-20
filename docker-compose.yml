@@ -11,7 +11,7 @@ services:
     # of the host's. Same pattern used by Netdata/cAdvisor.
     pid: host
     ports:
-      - "${SERVERDASH_PORT:-3000}:3000"
+      - "${SERVERDASH_PORT:-9900}:9900"
     environment:
       SERVERDASH_PUBLIC_HOST: "${SERVERDASH_PUBLIC_HOST:-nova.blacklink.net}"
       SERVERDASH_DOCKER_HOST: "${SERVERDASH_DOCKER_HOST:-unix:///var/run/docker.sock}"

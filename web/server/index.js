@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, '..', 'dist');
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 9900;
 const apiUrl = process.env.SERVERDASH_API_URL || 'http://127.0.0.1:8080';
 
 const app = express();
