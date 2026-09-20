@@ -16,15 +16,46 @@ type Config struct {
 	// all (e.g. "/rootfs" in the container deployment). Empty when running
 	// directly on the host.
 	HostRoot string
+	// DBPath is where the SQLite database (users, sessions, nicknames,
+	// automation rules, scripts) is stored.
+	DBPath string
+	// Kubeconfig is passed to kubectl as --kubeconfig; empty uses kubectl's
+	// own default resolution (KUBECONFIG env, ~/.kube/config, in-cluster).
+	Kubeconfig string
 }
 
 func Load() Config {
 	return Config{
 		ListenAddr: getEnv("SERVERDASH_LISTEN_ADDR", ":8080"),
-		DockerHost: getEnv("SERVERDASH_DOCKER_HOST", "unix:///var/run/docker.sock"),
+		DockerHost: resolveDockerHost(),
 		PublicHost: getEnv("SERVERDASH_PUBLIC_HOST", "nova.blacklink.net"),
 		HostRoot:   getEnv("SERVERDASH_HOST_ROOT", ""),
+		DBPath:     getEnv("SERVERDASH_DB_PATH", "./serverdash.db"),
+		Kubeconfig: getEnv("SERVERDASH_KUBECONFIG", ""),
 	}
+}
+
+// candidateDockerHosts is tried, in order, when SERVERDASH_DOCKER_HOST
+// isn't set explicitly: standard Docker socket first, then Podman's
+// rootless and rootful socket locations, so ServerDash works out of the
+// box against either runtime without configuration.
+func resolveDockerHost() string {
+	if v, ok := os.LookupEnv("SERVERDASH_DOCKER_HOST"); ok && v != "" {
+		return v
+	}
+
+	candidates := []string{"/var/run/docker.sock"}
+	if runtimeDir := os.Getenv("XDG_RUNTIME_DIR"); runtimeDir != "" {
+		candidates = append(candidates, runtimeDir+"/podman/podman.sock")
+	}
+	candidates = append(candidates, "/run/podman/podman.sock")
+
+	for _, path := range candidates {
+		if _, err := os.Stat(path); err == nil {
+			return "unix://" + path
+		}
+	}
+	return "unix:///var/run/docker.sock"
 }
 
 func getEnv(key, fallback string) string {

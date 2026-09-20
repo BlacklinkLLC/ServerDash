@@ -1,9 +1,10 @@
 <script>
 	import StatusBadge from './StatusBadge.svelte';
 	import LogViewer from './LogViewer.svelte';
+	import NicknameLabel from './NicknameLabel.svelte';
 	import { api } from './api.js';
 
-	let { containers, onaction } = $props();
+	let { containers, canOperate, onaction } = $props();
 
 	let logsFor = $state(null);
 	let pending = $state(new Set());
@@ -36,15 +37,31 @@
 		<tbody>
 			{#each containers as c (c.id)}
 				<tr>
-					<td>{c.name}</td>
+					<td>
+						<NicknameLabel
+							name={c.name}
+							nickname={c.nickname}
+							editable={canOperate}
+							onsave={async (nick) => {
+								await api.setContainerNickname(c.id, nick);
+								onaction?.();
+							}}
+							ondelete={async () => {
+								await api.deleteContainerNickname(c.id);
+								onaction?.();
+							}}
+						/>
+					</td>
 					<td><StatusBadge state={c.state} /></td>
 					<td class="muted">{c.image}</td>
 					<td class="muted">{c.ports.map((p) => `${p.publicPort || ''}${p.publicPort ? ':' : ''}${p.privatePort}`).join(', ') || '—'}</td>
 					<td class="actions">
-						<button disabled={pending.has(c.id)} onclick={() => run(c.state === 'running' ? 'stop' : 'start', c.id)}>
-							{c.state === 'running' ? 'Stop' : 'Start'}
-						</button>
-						<button disabled={pending.has(c.id)} onclick={() => run('restart', c.id)}>Restart</button>
+						{#if canOperate}
+							<button disabled={pending.has(c.id)} onclick={() => run(c.state === 'running' ? 'stop' : 'start', c.id)}>
+								{c.state === 'running' ? 'Stop' : 'Start'}
+							</button>
+							<button disabled={pending.has(c.id)} onclick={() => run('restart', c.id)}>Restart</button>
+						{/if}
 						<button onclick={() => (logsFor = c)}>Logs</button>
 					</td>
 				</tr>
@@ -54,7 +71,7 @@
 </section>
 
 {#if logsFor}
-	<LogViewer container={logsFor} onclose={() => (logsFor = null)} />
+	<LogViewer title={logsFor.name} socketUrl={api.containerLogsSocketUrl(logsFor.id)} onclose={() => (logsFor = null)} />
 {/if}
 
 <style>

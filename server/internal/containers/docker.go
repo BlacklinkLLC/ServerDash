@@ -7,20 +7,30 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 )
 
 type Container struct {
-	ID      string            `json:"id"`
-	Name    string            `json:"name"`
-	Image   string            `json:"image"`
-	State   string            `json:"state"`
-	Status  string            `json:"status"`
-	Created int64             `json:"created"`
-	Ports   []Port            `json:"ports"`
-	Labels  map[string]string `json:"labels"`
+	ID       string            `json:"id"`
+	Name     string            `json:"name"`
+	Nickname string            `json:"nickname,omitempty"`
+	Image    string            `json:"image"`
+	State    string            `json:"state"`
+	Status   string            `json:"status"`
+	Created  int64             `json:"created"`
+	Ports    []Port            `json:"ports"`
+	Labels   map[string]string `json:"labels"`
+}
+
+// Unhealthy reports whether the Engine API's human-readable status string
+// indicates a failing healthcheck — it's the only place this shows up in
+// the container list API (there's no separate structured health field).
+func (c Container) Unhealthy() bool {
+	return strings.Contains(c.Status, "(unhealthy)")
 }
 
 type Port struct {
@@ -118,4 +128,64 @@ func (c *Client) Logs(ctx context.Context, id string, follow bool) (io.ReadClose
 		return nil, fmt.Errorf("stream logs for %s: %w", id, err)
 	}
 	return rc, nil
+}
+
+// RuntimeInfo identifies which container runtime is on the other end of
+// the socket — Docker and Podman both speak the same Engine API, so this
+// is the only way to tell them apart for display purposes.
+type RuntimeInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+func (c *Client) RuntimeInfo(ctx context.Context) (RuntimeInfo, error) {
+	v, err := c.cli.ServerVersion(ctx)
+	if err != nil {
+		return RuntimeInfo{}, fmt.Errorf("query runtime version: %w", err)
+	}
+	name := v.Platform.Name
+	if name == "" {
+		name = "Docker Engine"
+	}
+	return RuntimeInfo{Name: name, Version: v.Version}, nil
+}
+
+// PruneReport summarizes what a prune pass removed, in bytes reclaimed and
+// item counts, across containers, images, and volumes.
+type PruneReport struct {
+	ContainersDeleted []string `json:"containersDeleted"`
+	ImagesDeleted     int      `json:"imagesDeleted"`
+	VolumesDeleted    []string `json:"volumesDeleted"`
+	SpaceReclaimed    uint64   `json:"spaceReclaimedBytes"`
+}
+
+// Prune removes stopped containers, dangling images, and unused volumes —
+// the same scope as `docker system prune`, minus networks (rarely worth
+// the churn) and minus the --all image flag (keeps images backing any
+// stopped-but-not-removed container available for a quick restart).
+func (c *Client) Prune(ctx context.Context) (PruneReport, error) {
+	var report PruneReport
+
+	cp, err := c.cli.ContainersPrune(ctx, filters.Args{})
+	if err != nil {
+		return report, fmt.Errorf("prune containers: %w", err)
+	}
+	report.ContainersDeleted = cp.ContainersDeleted
+	report.SpaceReclaimed += cp.SpaceReclaimed
+
+	ip, err := c.cli.ImagesPrune(ctx, filters.Args{})
+	if err != nil {
+		return report, fmt.Errorf("prune images: %w", err)
+	}
+	report.ImagesDeleted = len(ip.ImagesDeleted)
+	report.SpaceReclaimed += ip.SpaceReclaimed
+
+	vp, err := c.cli.VolumesPrune(ctx, filters.Args{})
+	if err != nil {
+		return report, fmt.Errorf("prune volumes: %w", err)
+	}
+	report.VolumesDeleted = vp.VolumesDeleted
+	report.SpaceReclaimed += vp.SpaceReclaimed
+
+	return report, nil
 }

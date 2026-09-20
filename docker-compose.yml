@@ -18,7 +18,11 @@ services:
       HOST_PROC: /host/proc
       HOST_SYS: /host/sys
       SERVERDASH_HOST_ROOT: /rootfs
+      # Only needed if you uncomment the kubeconfig mount below.
+      SERVERDASH_KUBECONFIG: "${SERVERDASH_KUBECONFIG:-}"
     volumes:
+      # Users, sessions, nicknames, automation rules, and scripts (SQLite).
+      - serverdash-data:/data
       # Full control over every container on the host — equivalent to root.
       # For Podman, point this at its socket instead (e.g.
       # /run/user/1000/podman/podman.sock) and update SERVERDASH_DOCKER_HOST
@@ -39,3 +43,11 @@ services:
         read_only: true
         bind:
           propagation: rslave
+      # Kubernetes support (optional): uncomment, then set
+      # SERVERDASH_KUBECONFIG=/kubeconfig in .env to manage a cluster from
+      # the dashboard. Leave both commented out and ServerDash just reports
+      # Kubernetes as unavailable.
+      # - ${KUBECONFIG:-~/.kube/config}:/kubeconfig:ro
+
+volumes:
+  serverdash-data:

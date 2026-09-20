@@ -1,14 +1,12 @@
 <script>
-	import { api } from './api.js';
-
-	let { container, onclose } = $props();
+	let { title, socketUrl, onclose } = $props();
 
 	let lines = $state([]);
 	let socket;
 
 	$effect(() => {
 		lines = [];
-		socket = new WebSocket(api.logsSocketUrl(container.id));
+		socket = new WebSocket(socketUrl);
 		socket.onmessage = (event) => {
 			lines = [...lines.slice(-500), event.data];
 		};
@@ -27,13 +25,13 @@
 		class="panel"
 		role="dialog"
 		aria-modal="true"
-		aria-label={`Logs for ${container.name}`}
+		aria-label={`Logs for ${title}`}
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
 		onkeydown={(e) => e.stopPropagation()}
 	>
 		<header>
-			<h3>{container.name}</h3>
+			<h3>{title}</h3>
 			<button onclick={onclose} aria-label="Close">✕</button>
 		</header>
 		<pre class="log">{lines.join('')}</pre>

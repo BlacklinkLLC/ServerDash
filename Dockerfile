@@ -17,7 +17,9 @@ RUN npm prune --omit=dev
 
 ## ---- Runtime: both processes, supervised ----
 FROM node:22-alpine
-RUN apk add --no-cache supervisor
+# supervisor: runs the Go API and Node web processes under one PID.
+# kubectl: optional Kubernetes support — a no-op if no kubeconfig is mounted.
+RUN apk add --no-cache supervisor kubectl
 WORKDIR /app
 
 COPY --from=go-builder /out/serverdash /app/serverdash
@@ -31,7 +33,12 @@ ENV SERVERDASH_LISTEN_ADDR=:8080 \
     SERVERDASH_API_URL=http://127.0.0.1:8080 \
     SERVERDASH_DOCKER_HOST=unix:///var/run/docker.sock \
     SERVERDASH_PUBLIC_HOST=nova.blacklink.net \
+    SERVERDASH_DB_PATH=/data/serverdash.db \
     PORT=9900
+
+# Users, sessions, nicknames, automation rules, and scripts all live here —
+# mount a volume at /data so they survive container recreation.
+VOLUME /data
 
 # Only the web UI's port needs to be published; the Go API is reached
 # internally over 127.0.0.1 by the Node process.

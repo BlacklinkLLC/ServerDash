@@ -1,6 +1,7 @@
 # Go
 /server/serverdash
 /server/*.exe
+/server/*.db
 
 # Node
 /web/node_modules
