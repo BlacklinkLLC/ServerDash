@@ -1,0 +1,13 @@
+# Go
+/server/serverdash
+/server/*.exe
+
+# Node
+/web/node_modules
+/web/dist
+
+# Env
+.env
+
+# Logs
+*.log

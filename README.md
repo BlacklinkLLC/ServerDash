@@ -1,3 +1,60 @@
+# ServerDash
+
+A self-hosted dashboard for monitoring servers and controlling their Docker/Podman
+containers. Deployed as a single container, served at **nova.blacklink.net**.
+
+## Architecture
+
+- **`server/`** — Go backend. Collects host metrics (CPU, memory, load, disk) and
+  controls containers over the Docker Engine API (Podman's socket is API-compatible,
+  so the same client works for either). Exposes an HTTP + WebSocket API.
+- **`web/`** — Svelte + Vite dashboard, served by a small Express server that also
+  proxies `/api` (including the WebSocket log stream) through to the Go backend, so
+  the browser only ever talks to one origin.
+- Both processes run in one container, managed by `supervisord` (see `Dockerfile`,
+  `docker/supervisord.conf`).
+
+## Running it
+
+```sh
+cp .env.example .env   # adjust SERVERDASH_PUBLIC_HOST, port, etc.
+docker compose up -d --build
+```
+
+This builds the image and starts ServerDash on `http://localhost:3000` (or
+`SERVERDASH_PORT` from `.env`), reverse-proxy it at **nova.blacklink.net** for the
+real deployment. `docker-compose.yml` mounts the Docker socket (swap for Podman's
+socket + `SERVERDASH_DOCKER_HOST` to manage Podman instead), and bind-mounts the
+host's `/proc`, `/sys`, and root filesystem (read-only) so host metrics reflect the
+real machine rather than the container's own view — see the comments in
+`docker-compose.yml` for why (`pid: host` and the `/rootfs` bind mount are both
+load-bearing, not incidental).
+
+Works the same with `podman-compose` and Podman's rootless socket.
+
+### Local development
+
+```sh
+# terminal 1 — Go API on :8080
+cd server && go run ./cmd/serverdash
+
+# terminal 2 — Svelte dev server on :5173, proxying /api to :8080
+cd web && npm install && npm run dev
+```
+
+## Implemented so far
+
+- Server overview: hostname, platform, uptime, load average
+- CPU, memory, and per-disk usage (with usage bars)
+- Container list: name, status, image, ports
+- Start / stop / restart containers
+- Live container log streaming over WebSocket
+
+Everything below is the product roadmap — features to build toward, not yet
+implemented.
+
+## Roadmap
+
 Core dashboard
 
 * Server overview

@@ -1,0 +1,41 @@
+services:
+  serverdash:
+    build: .
+    image: serverdash:latest
+    container_name: serverdash
+    restart: unless-stopped
+    # Shares the host's PID namespace. Without this, the container can only
+    # see its own mount table (via /proc/self), not the host's, because
+    # reading another PID namespace's /proc/1/mountinfo needs it — so disk
+    # usage would silently report the container's own filesystem instead
+    # of the host's. Same pattern used by Netdata/cAdvisor.
+    pid: host
+    ports:
+      - "${SERVERDASH_PORT:-3000}:3000"
+    environment:
+      SERVERDASH_PUBLIC_HOST: "${SERVERDASH_PUBLIC_HOST:-nova.blacklink.net}"
+      SERVERDASH_DOCKER_HOST: "${SERVERDASH_DOCKER_HOST:-unix:///var/run/docker.sock}"
+      HOST_PROC: /host/proc
+      HOST_SYS: /host/sys
+      SERVERDASH_HOST_ROOT: /rootfs
+    volumes:
+      # Full control over every container on the host — equivalent to root.
+      # For Podman, point this at its socket instead (e.g.
+      # /run/user/1000/podman/podman.sock) and update SERVERDASH_DOCKER_HOST
+      # to match. Not mounted read-only: starting/stopping containers needs
+      # a writable connection to the socket.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Host metrics (CPU/mem/load): gopsutil reads these via HOST_PROC/
+      # HOST_SYS above instead of the container's own /proc, /sys.
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      # Host disk usage: mountpoints discovered via /host/proc/1/mountinfo
+      # (e.g. /boot) only exist in the *host's* mount namespace, so they're
+      # statted here instead of at their raw path. rslave propagation makes
+      # the host's nested mounts (not just its top-level root) show up too.
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+        bind:
+          propagation: rslave
