@@ -5,6 +5,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"serverdash/internal/store"
@@ -16,23 +17,35 @@ type contextKey int
 
 const userContextKey contextKey = 0
 
+// isHTTPS reports whether the original client request was HTTPS — either
+// terminated directly on this process (r.TLS set) or by a reverse proxy in
+// front of it (X-Forwarded-Proto). ServerDash is commonly reached both ways
+// depending on deployment (a bare LAN IP over plain HTTP during setup, or
+// nova.blacklink.net behind TLS in production), so the cookie's Secure flag
+// has to follow the actual connection rather than being hardcoded: a
+// browser silently refuses to set a Secure cookie over plain HTTP, which
+// would otherwise break login for any HTTP-only access.
+func isHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
 // SetSessionCookie issues the session cookie for a freshly created session.
-// Secure is left true always: ServerDash is expected to sit behind a TLS
-// reverse proxy (nova.blacklink.net); a plain-HTTP deployment would need
-// this relaxed, but shipping it secure-by-default is the safer choice.
-func SetSessionCookie(w http.ResponseWriter, sess store.Session) {
+func SetSessionCookie(w http.ResponseWriter, r *http.Request, sess store.Session) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    sess.Token,
 		Path:     "/",
 		Expires:  sess.ExpiresAt,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
-func ClearSessionCookie(w http.ResponseWriter) {
+func ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    "",
@@ -40,7 +53,7 @@ func ClearSessionCookie(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }

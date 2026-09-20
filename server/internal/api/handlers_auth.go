@@ -57,7 +57,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	auth.SetSessionCookie(w, sess)
+	auth.SetSessionCookie(w, r, sess)
 	writeJSON(w, http.StatusCreated, userResponse(user))
 }
 
@@ -79,7 +79,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	auth.SetSessionCookie(w, sess)
+	auth.SetSessionCookie(w, r, sess)
 	writeJSON(w, http.StatusOK, userResponse(user))
 }
 
@@ -87,7 +87,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(auth.CookieName); err == nil {
 		_ = s.store.DeleteSession(r.Context(), cookie.Value)
 	}
-	auth.ClearSessionCookie(w)
+	auth.ClearSessionCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
