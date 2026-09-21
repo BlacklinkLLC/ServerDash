@@ -20,9 +20,12 @@ services:
       SERVERDASH_HOST_ROOT: /rootfs
       # Only needed if you uncomment the kubeconfig mount below.
       SERVERDASH_KUBECONFIG: "${SERVERDASH_KUBECONFIG:-}"
-      # Used by a workflow's "Rebuild & Run" block; see the workflow mount
-      # note further down for the rest of what that block needs.
+      # Used by a workflow's "Rebuild & Run" block, and by the self-update
+      # panel's rebuild step; see the mount notes further down.
       SERVERDASH_COMPOSE_CMD: "${SERVERDASH_COMPOSE_CMD:-docker compose}"
+      # Self-update (optional): only needed if you uncomment the install-dir
+      # mount below. Enables Admin → Updates.
+      SERVERDASH_INSTALL_DIR: "${SERVERDASH_INSTALL_DIR:-}"
     volumes:
       # Users, sessions, nicknames, automation rules, and scripts (SQLite).
       - serverdash-data:/data
@@ -58,16 +61,22 @@ services:
       # on the host, so mount whatever parent directory holds your deployed
       # projects (not /tmp — see the note on security_opt below).
       # - /opt:/opt
+      #
+      # Self-update (optional): set SERVERDASH_INSTALL_DIR above to this
+      # same path to enable Admin → Updates for this checkout.
+      # - ${PWD}:${PWD}
     # On SELinux-enforcing hosts (Fedora/RHEL/CentOS) only: the mounted
     # directories above need :Z (e.g. "/opt:/opt:Z") to be readable at all.
-    # That alone isn't enough for the git_pull/compose_up blocks specifically
-    # — SELinux's container policy separately blocks a container's own
-    # nested `docker`/`git` CLI calls against the mounted docker.sock, even
-    # though the dashboard's own container list/start/stop/restart (which
-    # goes straight to the Engine API, not through the CLI) works fine
-    # either way. If you want those two workflow block types, uncomment
-    # this — it runs ServerDash unconfined, weakening the isolation SELinux
-    # normally gives a container; skip it if you don't need them.
+    # That alone isn't enough for the workflow git_pull/compose_up blocks
+    # specifically — SELinux's container policy separately blocks a
+    # container's own nested `docker`/`git` CLI calls against the mounted
+    # docker.sock, even though the dashboard's own container list/start/
+    # stop/restart (straight to the Engine API, not through the CLI) works
+    # fine either way. If you want those two workflow block types,
+    # uncomment this — it runs ServerDash unconfined, weakening the
+    # isolation SELinux normally gives a container; skip it if you don't
+    # need them. Self-update doesn't need this: its rebuild step runs in a
+    # separate, short-lived helper container that's unconfined on its own.
     # security_opt:
     #   - label=disable
 

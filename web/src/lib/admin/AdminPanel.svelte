@@ -3,7 +3,8 @@
 	import AutomationTab from './AutomationTab.svelte';
 	import ScriptsTab from './ScriptsTab.svelte';
 	import WorkflowsTab from './WorkflowsTab.svelte';
-	import BrandingTab from './BrandingTab.svelte';
+	import AppearanceTab from './AppearanceTab.svelte';
+	import UpdatesTab from './UpdatesTab.svelte';
 
 	let { currentUserId, branding, onbrandingchange } = $props();
 
@@ -17,7 +18,8 @@
 		<button class:active={tab === 'automation'} onclick={() => (tab = 'automation')}>Automation</button>
 		<button class:active={tab === 'scripts'} onclick={() => (tab = 'scripts')}>Scripts</button>
 		<button class:active={tab === 'workflows'} onclick={() => (tab = 'workflows')}>Workflows</button>
-		<button class:active={tab === 'branding'} onclick={() => (tab = 'branding')}>Branding</button>
+		<button class:active={tab === 'appearance'} onclick={() => (tab = 'appearance')}>Appearance</button>
+		<button class:active={tab === 'updates'} onclick={() => (tab = 'updates')}>Updates</button>
 	</nav>
 
 	{#if tab === 'users'}
@@ -28,8 +30,10 @@
 		<ScriptsTab />
 	{:else if tab === 'workflows'}
 		<WorkflowsTab />
-	{:else if tab === 'branding'}
-		<BrandingTab {branding} {onbrandingchange} />
+	{:else if tab === 'appearance'}
+		<AppearanceTab {branding} {onbrandingchange} />
+	{:else if tab === 'updates'}
+		<UpdatesTab />
 	{/if}
 </section>
 
@@ -43,6 +47,7 @@
 		gap: 4px;
 		margin-bottom: 18px;
 		border-bottom: 1px solid var(--border);
+		flex-wrap: wrap;
 	}
 	.tabs button {
 		background: none;

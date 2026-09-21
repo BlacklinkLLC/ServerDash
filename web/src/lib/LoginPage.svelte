@@ -25,38 +25,52 @@
 </script>
 
 <div class="wrap">
-	<form class="auth-card" onsubmit={submit}>
-		<div class="brand">
-			<BrandLogo {branding} size={32} />
-			<h1>{branding?.appName ?? 'ServerDash'}</h1>
-		</div>
-		<p class="subtitle">Sign in to continue.</p>
+	<div class="center">
+		<form class="auth-card" onsubmit={submit}>
+			<div class="brand">
+				<BrandLogo {branding} size={32} />
+				<h1>{branding?.appName ?? 'ServerDash'}</h1>
+			</div>
+			<p class="subtitle">Sign in to continue.</p>
 
-		{#if error}
-			<p class="error">{error}</p>
-		{/if}
+			{#if error}
+				<p class="error">{error}</p>
+			{/if}
 
-		<label>
-			Username
-			<input bind:value={username} autocomplete="username" required autofocus />
-		</label>
-		<label>
-			Password
-			<input type="password" bind:value={password} autocomplete="current-password" required />
-		</label>
+			<label>
+				Username
+				<input bind:value={username} autocomplete="username" required autofocus />
+			</label>
+			<label>
+				Password
+				<input type="password" bind:value={password} autocomplete="current-password" required />
+			</label>
 
-		<button class="btn primary" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
-	</form>
+			<button class="btn primary" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
+		</form>
+	</div>
+	<footer>ServerDash by Blacklink Enterprise. ©2026 Blacklink, Inc. All Rights Reserved.</footer>
 </div>
 
 <style>
 	.wrap {
 		min-height: 100vh;
 		display: flex;
+		flex-direction: column;
+		background: var(--bg);
+	}
+	.center {
+		flex: 1;
+		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: 16px;
-		background: var(--bg);
+	}
+	footer {
+		text-align: center;
+		padding: 0 16px 20px;
+		color: var(--muted);
+		font-size: 11px;
 	}
 	.auth-card {
 		width: min(340px, 100%);

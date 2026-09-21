@@ -59,6 +59,7 @@ export const api = {
 	setContainerNickname: (id, nickname) => put(`/api/containers/${id}/nickname`, { nickname }),
 	deleteContainerNickname: (id) => del(`/api/containers/${id}/nickname`),
 	containerLogsSocketUrl: (id) => wsUrl(`/api/containers/${id}/logs`),
+	containerTerminalSocketUrl: (id) => wsUrl(`/api/containers/${id}/terminal`),
 
 	// --- Kubernetes ---
 	k8sStatus: () => request('/api/k8s/status'),
@@ -99,9 +100,9 @@ export const api = {
 	runWorkflow: (id) => post(`/api/workflows/${id}/run`),
 	workflowRuns: (id) => request(`/api/workflows/${id}/runs`),
 
-	// --- Settings / branding ---
+	// --- Settings / branding / appearance ---
 	settings: () => request('/api/settings'),
-	updateSettings: (appName) => put('/api/settings', { appName }),
+	updateSettings: (patch) => put('/api/settings', patch),
 	uploadLogo: async (file) => {
 		const form = new FormData();
 		form.append('logo', file);
@@ -113,4 +114,8 @@ export const api = {
 		return res.json();
 	},
 	deleteLogo: () => del('/api/settings/logo'),
+
+	// --- Self-update (admin) ---
+	updateStatus: () => request('/api/updates/status'),
+	applyUpdate: () => post('/api/updates/apply'),
 };

@@ -5,17 +5,25 @@
 	let { branding, onbrandingchange } = $props();
 
 	let appName = $state(branding?.appName ?? 'ServerDash');
+	let accentColor = $state(branding?.accentColor ?? '#ffb020');
+	let showSystem = $state(branding?.showSystem ?? true);
+	let showContainers = $state(branding?.showContainers ?? true);
 	let error = $state(null);
 	let saving = $state(false);
 	let uploading = $state(false);
 	let fileInput = $state(null);
 
-	async function saveName(e) {
+	async function save(e) {
 		e.preventDefault();
 		saving = true;
 		error = null;
 		try {
-			const updated = await api.updateSettings(appName);
+			const updated = await api.updateSettings({
+				appName,
+				accentColor,
+				showSystem,
+				showContainers,
+			});
 			onbrandingchange?.(updated);
 		} catch (e) {
 			error = e.message;
@@ -56,15 +64,6 @@
 	{/if}
 
 	<section class="block">
-		<h3>App name</h3>
-		<p class="muted">Shown in the header, browser tab, and sign-in screen. Rename it to your own company/product name.</p>
-		<form class="row" onsubmit={saveName}>
-			<input bind:value={appName} maxlength="60" placeholder="ServerDash" />
-			<button class="btn primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-		</form>
-	</section>
-
-	<section class="block">
 		<h3>Logo</h3>
 		<p class="muted">PNG, JPEG, SVG, WebP, or ICO, up to 2MB. Replaces the default monogram everywhere the app name appears.</p>
 		<div class="row">
@@ -86,6 +85,37 @@
 			{/if}
 		</div>
 	</section>
+
+	<form class="block" onsubmit={save}>
+		<h3>Name &amp; color</h3>
+		<p class="muted">Shown in the header, browser tab, and sign-in screen. Rename it to your own company/product name.</p>
+		<div class="row">
+			<label class="field">
+				App name
+				<input bind:value={appName} maxlength="60" placeholder="ServerDash" />
+			</label>
+			<label class="field color-field">
+				Accent color
+				<div class="color-row">
+					<input type="color" bind:value={accentColor} />
+					<input class="mono" bind:value={accentColor} maxlength="7" placeholder="#ffb020" />
+				</div>
+			</label>
+		</div>
+
+		<h3>Dashboard</h3>
+		<p class="muted">Choose which sections show on the main Dashboard page for everyone.</p>
+		<label class="checkbox">
+			<input type="checkbox" bind:checked={showSystem} />
+			Server overview (CPU, memory, disks, uptime)
+		</label>
+		<label class="checkbox">
+			<input type="checkbox" bind:checked={showContainers} />
+			Services (container list)
+		</label>
+
+		<button class="btn primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+	</form>
 </div>
 
 <style>
@@ -107,6 +137,9 @@
 		margin: 0;
 		font-size: 14px;
 	}
+	h3:not(:first-child) {
+		margin-top: 6px;
+	}
 	.muted {
 		margin: 0;
 		color: var(--muted);
@@ -118,12 +151,42 @@
 	}
 	.row {
 		display: flex;
-		align-items: center;
-		gap: 10px;
+		align-items: flex-end;
+		gap: 16px;
+		flex-wrap: wrap;
 	}
-	.row > input {
-		flex: 1;
-		max-width: 320px;
+	.field {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 11px;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+	.field input:not([type='color']) {
+		min-width: 220px;
+	}
+	.color-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.color-row input[type='color'] {
+		width: 40px;
+		height: 34px;
+		padding: 2px;
+	}
+	.color-row input.mono {
+		width: 100px;
+		font-family: var(--font-mono);
+	}
+	.checkbox {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 12px;
+		color: var(--text);
 	}
 	.preview {
 		display: flex;

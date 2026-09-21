@@ -30,9 +30,16 @@ type Config struct {
 	// today) — defaults to the SQLite database's own directory so both
 	// live under the same mounted volume without extra configuration.
 	DataDir string
-	// ComposeCmd is the command a workflow's "compose_up" block runs, split
-	// on spaces (e.g. "docker compose" or "podman-compose").
+	// ComposeCmd is the command a workflow's "compose_up" block (and the
+	// self-update panel) runs, split on spaces (e.g. "docker compose" or
+	// "podman-compose").
 	ComposeCmd []string
+	// InstallDir is ServerDash's own git checkout on the host, mounted into
+	// this container at the same path — same requirement as a workflow's
+	// git_pull/compose_up blocks. Empty disables the self-update panel
+	// rather than erroring, since most Kubernetes/other-install-method
+	// deployments won't have this.
+	InstallDir string
 }
 
 func Load() Config {
@@ -46,6 +53,7 @@ func Load() Config {
 		Kubeconfig: getEnv("SERVERDASH_KUBECONFIG", ""),
 		DataDir:    getEnv("SERVERDASH_DATA_DIR", filepath.Dir(dbPath)),
 		ComposeCmd: strings.Fields(getEnv("SERVERDASH_COMPOSE_CMD", "docker compose")),
+		InstallDir: getEnv("SERVERDASH_INSTALL_DIR", ""),
 	}
 }
 

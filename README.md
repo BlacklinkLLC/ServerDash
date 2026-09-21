@@ -3,29 +3,35 @@
 A self-hosted dashboard for monitoring servers and controlling their Docker/Podman
 containers and Kubernetes pods. Deployed as a single container, served at
 **nova.blacklink.net**. Visual design matches Blacklink's NOVA design system
-(dark, amber accent, Syne/DM Mono type) — see `web/src/app.css`. Both the app name
-and logo are runtime-configurable (Admin → Branding), for white-labeling.
+(dark, amber accent, Syne/DM Mono type) — see `web/src/app.css`. App name, logo,
+accent color, and which dashboard sections show are all runtime-configurable from
+Admin → Appearance, for white-labeling and per-deployment customization.
 
 ## Architecture
 
 - **`server/`** — Go backend.
   - Host metrics (CPU, memory, load, disk) via gopsutil.
   - Docker/Podman container control over the Docker Engine API (Podman's socket is
-    API-compatible, so the same client works for either).
+    API-compatible, so the same client works for either), plus an interactive
+    web terminal (`docker exec`-equivalent) over WebSocket.
   - Kubernetes pod listing/restart/logs by shelling out to `kubectl` — reuses
     whatever kubeconfig/contexts/auth plugins are already set up rather than
     reimplementing cluster auth.
   - Auth (session cookies, bcrypt), users/roles, nicknames, automation rules,
-    scripts, workflows, and branding, all persisted in an embedded SQLite
-    database (`internal/store`).
+    scripts, workflows, and settings/branding, all persisted in an embedded
+    SQLite database (`internal/store`) — see [Data persistence](#data-persistence)
+    for what has to be true for this to survive an update.
   - Built-in automation + user script + workflow scheduling via a cron runner
     (`internal/automation`), including per-workflow timezones.
   - `internal/workflow`: the block-based deployment automation language — see
     [Workflows](#workflows-block-based-deployment-automation) below.
+  - `internal/selfupdate`: checks ServerDash's own git checkout for upstream
+    changes and can pull + rebuild + restart itself — see
+    [Self-update](#self-update) below.
   - Exposes all of it through an authenticated HTTP + WebSocket API.
 - **`web/`** — Svelte + Vite dashboard, served by a small Express server that also
-  proxies `/api` (including WebSocket log streams) through to the Go backend, so
-  the browser only ever talks to one origin.
+  proxies `/api` (including WebSocket log/terminal streams) through to the Go
+  backend, so the browser only ever talks to one origin.
 - Both processes run in one container, managed by `supervisord` (see `Dockerfile`,
   `docker/supervisord.conf`).
 - **`install.sh`** — installs Docker or Podman if missing, fetches ServerDash, and
@@ -40,6 +46,20 @@ setup, and login) are unreachable until that account exists. From then on, sign-
 is required for everyone; `admin` users manage other accounts, roles, automation,
 and scripts from the Admin panel, `operator` can act on containers/pods but not
 touch admin settings, and `viewer` is read-only.
+
+## Data persistence
+
+Users, sessions, nicknames, settings/branding, scripts, and workflows all live in
+one SQLite file at `SERVERDASH_DB_PATH` (default `/data/serverdash.db` in the
+container); an uploaded logo lives alongside it under `SERVERDASH_DATA_DIR`
+(defaults to that same `/data`). `docker-compose.yml` keeps `/data` in a named
+volume (`serverdash-data`), which — like any Docker volume — survives
+`docker compose up -d --build`, `docker compose down` (without `-v`), and image
+rebuilds; it's only lost if you explicitly remove that volume or run ServerDash
+some other way (e.g. plain `docker run`) without mounting a persistent path there.
+On startup, ServerDash logs exactly where it's storing data, including a loud
+warning if it's about to use the non-persistent default path — check `docker logs`
+if something seems to have reset.
 
 ## Running it
 
@@ -137,11 +157,38 @@ Two more things that come up specifically on SELinux-enforcing hosts
   root over a host-user-owned directory, is handled for you — no
   `safe.directory` config needed.)
 
+## Self-update
+
+Admin → Updates checks ServerDash's own git checkout against its remote (`git
+fetch` + compare `HEAD` to `origin/<branch>`) and, if there's something new, pulls
+and redeploys with one click. Needs `SERVERDASH_INSTALL_DIR` set to that
+checkout's path on the host, mounted into the container at the same path — same
+requirement as a workflow's `git_pull`/`compose_up` blocks, and the same `:Z` note
+applies on SELinux-enforcing hosts. Unlike those workflow blocks, self-update
+*doesn't* need `security_opt: label=disable` on ServerDash's own container: since
+ServerDash is rebuilding and restarting itself, the actual `docker compose up -d
+--build` runs in a separate, short-lived helper container (launched with `docker
+run -d`, from the same image ServerDash itself is running, so nothing extra needs
+pulling) that's unconfined on its own and exits once the rebuild's handed off —
+the `git pull` itself, which doesn't need that, still runs directly in ServerDash's
+own container. Your data isn't affected either way — see
+[Data persistence](#data-persistence).
+
+## Web terminal
+
+Admin-only "Terminal" button on any running container (Services list) opens an
+interactive shell — `docker exec`-equivalent, xterm.js in the browser talking to
+the Engine API's exec/attach endpoints over WebSocket, full PTY resize support.
+Tries `bash`, falls back to `sh` for minimal images. Works against Podman
+containers unmodified, same as every other container control — it's the same
+Engine API client throughout.
+
 ## Implemented so far
 
 - Server overview: hostname, platform, uptime, load average
 - CPU, memory, and per-disk usage (with usage bars)
-- Docker/Podman: container list, start/stop/restart, live log streaming
+- Docker/Podman: container list, start/stop/restart, live log streaming, an
+  interactive web terminal (admin-only) — see above
 - Kubernetes: pod list (across contexts/namespaces), restart (delete → controller
   recreates), live log streaming
 - Nicknames: rename any container or pod to a friendlier display name
@@ -153,8 +200,11 @@ Two more things that come up specifically on SELinux-enforcing hosts
   run history and captured output
 - Workflows: block-based scheduled deployment automation (git pull, rebuild/run
   via compose, restart a container, run a command, wait) — see above
-- Branding: rename the app and swap in your own logo from Admin → Branding, shown
+- Appearance: rename the app, swap in your own logo, pick an accent color, and
+  choose which dashboard sections show, all from Admin → Appearance, shown
   everywhere including the sign-in screen
+- Self-update: check ServerDash's own git checkout for updates and redeploy from
+  the Admin panel — see above
 - `install.sh` for a one-line install on a bare server
 
 Everything below is the product roadmap — features to build toward, not yet

@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -128,6 +129,36 @@ func (c *Client) Logs(ctx context.Context, id string, follow bool) (io.ReadClose
 		return nil, fmt.Errorf("stream logs for %s: %w", id, err)
 	}
 	return rc, nil
+}
+
+// Exec starts an interactive shell inside a container and returns the
+// hijacked, bidirectional connection: writes go to the shell's stdin,
+// reads come from its combined stdout/stderr (merged, since Tty is true).
+// The caller closes the returned connection when done. Tries bash first,
+// falling back to sh — most minimal images (alpine et al.) only have the
+// latter, but bash is worth preferring where it exists.
+func (c *Client) Exec(ctx context.Context, id string) (execID string, conn types.HijackedResponse, err error) {
+	cmd := []string{"sh", "-c", "if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi"}
+	created, err := c.cli.ContainerExecCreate(ctx, id, container.ExecOptions{
+		Cmd:          cmd,
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+	})
+	if err != nil {
+		return "", types.HijackedResponse{}, fmt.Errorf("create exec session for %s: %w", id, err)
+	}
+
+	attached, err := c.cli.ContainerExecAttach(ctx, created.ID, container.ExecAttachOptions{Tty: true})
+	if err != nil {
+		return "", types.HijackedResponse{}, fmt.Errorf("attach exec session for %s: %w", id, err)
+	}
+	return created.ID, attached, nil
+}
+
+func (c *Client) ExecResize(ctx context.Context, execID string, height, width uint) error {
+	return c.cli.ContainerExecResize(ctx, execID, container.ResizeOptions{Height: height, Width: width})
 }
 
 // RuntimeInfo identifies which container runtime is on the other end of

@@ -2,12 +2,17 @@
 	import StatTile from './StatTile.svelte';
 	import { formatBytes, formatUptime, formatPercent } from './format.js';
 
-	let { snapshot } = $props();
+	let { snapshot, runtime } = $props();
 </script>
 
 <section>
 	<h2>{snapshot?.hostname ?? 'Server'}</h2>
-	<p class="subtitle">{snapshot?.platform ?? ''}</p>
+	<p class="subtitle">
+		{snapshot?.platform ?? ''}
+		{#if runtime}
+			<span class="badge-pill muted runtime">{runtime.name} {runtime.version}</span>
+		{/if}
+	</p>
 
 	<div class="tiles">
 		<StatTile label="CPU" value={formatPercent(snapshot?.cpuPercent)} percent={snapshot?.cpuPercent ?? 0} />
@@ -43,8 +48,15 @@
 	}
 	.subtitle {
 		margin: 0 0 16px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		color: var(--muted);
 		font-size: 12px;
+	}
+	.runtime {
+		text-transform: none;
+		letter-spacing: normal;
 	}
 	.tiles {
 		display: flex;

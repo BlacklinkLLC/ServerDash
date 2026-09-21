@@ -33,6 +33,13 @@ func main() {
 	}
 	defer db.Close()
 
+	log.Printf("serverdash: data (users, sessions, nicknames, settings, scripts, workflows) stored at %s", cfg.DBPath)
+	if cfg.DBPath == "./serverdash.db" {
+		log.Printf("serverdash: WARNING: using the default relative DB path — set SERVERDASH_DB_PATH to a location on a" +
+			" persistent volume (docker-compose.yml's serverdash-data volume does this for you), or all data is lost" +
+			" whenever this container is recreated, including by an update")
+	}
+
 	kubeClient := kubernetes.New(cfg.Kubeconfig)
 
 	runner := automation.NewRunner(db, dockerClient, cfg.ComposeCmd)

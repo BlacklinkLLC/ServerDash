@@ -30,42 +30,56 @@
 </script>
 
 <div class="wrap">
-	<form class="auth-card" onsubmit={submit}>
-		<div class="brand">
-			<BrandLogo {branding} size={32} />
-			<h1>Welcome to {branding?.appName ?? 'ServerDash'}</h1>
-		</div>
-		<p class="subtitle">Create the first administrator account to get started.</p>
+	<div class="center">
+		<form class="auth-card" onsubmit={submit}>
+			<div class="brand">
+				<BrandLogo {branding} size={32} />
+				<h1>Welcome to {branding?.appName ?? 'ServerDash'}</h1>
+			</div>
+			<p class="subtitle">Create the first administrator account to get started.</p>
 
-		{#if error}
-			<p class="error">{error}</p>
-		{/if}
+			{#if error}
+				<p class="error">{error}</p>
+			{/if}
 
-		<label>
-			Username
-			<input bind:value={username} autocomplete="username" required minlength="3" />
-		</label>
-		<label>
-			Password
-			<input type="password" bind:value={password} autocomplete="new-password" required minlength="8" />
-		</label>
-		<label>
-			Confirm password
-			<input type="password" bind:value={confirm} autocomplete="new-password" required minlength="8" />
-		</label>
+			<label>
+				Username
+				<input bind:value={username} autocomplete="username" required minlength="3" />
+			</label>
+			<label>
+				Password
+				<input type="password" bind:value={password} autocomplete="new-password" required minlength="8" />
+			</label>
+			<label>
+				Confirm password
+				<input type="password" bind:value={confirm} autocomplete="new-password" required minlength="8" />
+			</label>
 
-		<button class="btn primary" type="submit" disabled={submitting}>{submitting ? 'Creating…' : 'Create admin account'}</button>
-	</form>
+			<button class="btn primary" type="submit" disabled={submitting}>{submitting ? 'Creating…' : 'Create admin account'}</button>
+		</form>
+	</div>
+	<footer>ServerDash by Blacklink Enterprise. ©2026 Blacklink, Inc. All Rights Reserved.</footer>
 </div>
 
 <style>
 	.wrap {
 		min-height: 100vh;
 		display: flex;
+		flex-direction: column;
+		background: var(--bg);
+	}
+	.center {
+		flex: 1;
+		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: 16px;
-		background: var(--bg);
+	}
+	footer {
+		text-align: center;
+		padding: 0 16px 20px;
+		color: var(--muted);
+		font-size: 11px;
 	}
 	.auth-card {
 		width: min(380px, 100%);

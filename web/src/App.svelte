@@ -1,6 +1,7 @@
 <script>
 	import { onDestroy, onMount } from 'svelte';
 	import { api } from './lib/api.js';
+	import { applyAccentColor } from './lib/color.js';
 	import SystemOverview from './lib/SystemOverview.svelte';
 	import ContainerList from './lib/ContainerList.svelte';
 	import KubernetesView from './lib/KubernetesView.svelte';
@@ -12,7 +13,8 @@
 	// 'loading' | 'setup' | 'login' | 'ready'
 	let authState = $state('loading');
 	let user = $state(null);
-	let branding = $state({ appName: 'ServerDash', logoUrl: null });
+	let branding = $state({ appName: 'ServerDash', logoUrl: null, accentColor: '#ffb020', showSystem: true, showContainers: true });
+	let runtime = $state(null);
 
 	let page = $state('dashboard'); // 'dashboard' | 'kubernetes' | 'admin'
 
@@ -28,6 +30,7 @@
 			// never worth blocking the rest of the app over.
 		}
 		document.title = branding.appName;
+		applyAccentColor(branding.accentColor || '#ffb020');
 	}
 
 	async function resolveAuth() {
@@ -73,6 +76,9 @@
 			}
 			error = e.message;
 		}
+		api.runtime()
+			.then((r) => (runtime = r))
+			.catch(() => {});
 	}
 
 	let timer;
@@ -90,6 +96,12 @@
 
 	let canOperate = $derived(user?.role === 'admin' || user?.role === 'operator');
 	let isAdmin = $derived(user?.role === 'admin');
+
+	function onBrandingChange(updated) {
+		branding = updated;
+		document.title = branding.appName;
+		applyAccentColor(branding.accentColor || '#ffb020');
+	}
 </script>
 
 {#if authState === 'loading'}
@@ -123,14 +135,20 @@
 		{/if}
 
 		{#if page === 'dashboard'}
-			<SystemOverview {snapshot} />
-			<ContainerList {containers} {canOperate} onaction={refresh} />
+			{#if branding.showSystem}
+				<SystemOverview {snapshot} {runtime} />
+			{/if}
+			{#if branding.showContainers}
+				<ContainerList {containers} {canOperate} {isAdmin} onaction={refresh} />
+			{/if}
 		{:else if page === 'kubernetes'}
 			<KubernetesView {canOperate} />
 		{:else if page === 'admin'}
-			<AdminPanel currentUserId={user.id} {branding} onbrandingchange={(b) => (branding = b)} />
+			<AdminPanel currentUserId={user.id} {branding} onbrandingchange={onBrandingChange} />
 		{/if}
 	</main>
+
+	<footer>ServerDash by Blacklink Enterprise. ©2026 Blacklink, Inc. All Rights Reserved.</footer>
 {/if}
 
 <style>
@@ -197,5 +215,11 @@
 	.error {
 		color: var(--danger);
 		font-size: 13px;
+	}
+	footer {
+		text-align: center;
+		padding: 20px 24px 28px;
+		color: var(--muted);
+		font-size: 11px;
 	}
 </style>

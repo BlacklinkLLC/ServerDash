@@ -1,12 +1,14 @@
 <script>
 	import StatusBadge from './StatusBadge.svelte';
 	import LogViewer from './LogViewer.svelte';
+	import TerminalView from './TerminalView.svelte';
 	import NicknameLabel from './NicknameLabel.svelte';
 	import { api } from './api.js';
 
-	let { containers, canOperate, onaction } = $props();
+	let { containers, canOperate, isAdmin, onaction } = $props();
 
 	let logsFor = $state(null);
+	let terminalFor = $state(null);
 	let pending = $state(new Set());
 
 	async function run(action, id) {
@@ -63,6 +65,9 @@
 							<button class="btn subtle" disabled={pending.has(c.id)} onclick={() => run('restart', c.id)}>Restart</button>
 						{/if}
 						<button class="btn subtle" onclick={() => (logsFor = c)}>Logs</button>
+						{#if isAdmin && c.state === 'running'}
+							<button class="btn subtle" onclick={() => (terminalFor = c)}>Terminal</button>
+						{/if}
 					</td>
 				</tr>
 			{/each}
@@ -72,6 +77,9 @@
 
 {#if logsFor}
 	<LogViewer title={logsFor.name} socketUrl={api.containerLogsSocketUrl(logsFor.id)} onclose={() => (logsFor = null)} />
+{/if}
+{#if terminalFor}
+	<TerminalView title={terminalFor.name} socketUrl={api.containerTerminalSocketUrl(terminalFor.id)} onclose={() => (terminalFor = null)} />
 {/if}
 
 <style>

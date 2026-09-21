@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -14,9 +15,12 @@ import (
 
 const (
 	defaultAppName    = "ServerDash"
+	defaultAccent     = "#ffb020" // NOVA's amber — matches app.css's --accent default
 	maxAppNameLength  = 60
 	maxLogoUploadSize = 2 << 20 // 2MB — plenty for a logo, small enough to not be a DoS vector
 )
+
+var accentColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 // logoContentTypes maps accepted upload content types to the file
 // extension they're stored under.
@@ -34,10 +38,14 @@ func (s *Server) brandingDir() string {
 
 // settingsResponse is what both the public GET /api/settings and the admin
 // PUT return: enough for the login/setup screens (unauthenticated) to
-// render the operator's branding before anyone has signed in.
+// render the operator's branding before anyone has signed in, plus the
+// appearance/customization options the dashboard reads once signed in.
 type settingsResponse struct {
-	AppName string  `json:"appName"`
-	LogoURL *string `json:"logoUrl,omitempty"`
+	AppName        string  `json:"appName"`
+	LogoURL        *string `json:"logoUrl,omitempty"`
+	AccentColor    string  `json:"accentColor"`
+	ShowSystem     bool    `json:"showSystem"`
+	ShowContainers bool    `json:"showContainers"`
 }
 
 func (s *Server) currentSettings(r *http.Request) settingsResponse {
@@ -45,8 +53,17 @@ func (s *Server) currentSettings(r *http.Request) settingsResponse {
 	if v, ok, _ := s.store.GetSetting(r.Context(), "app_name"); ok && v != "" {
 		appName = v
 	}
+	accent := defaultAccent
+	if v, ok, _ := s.store.GetSetting(r.Context(), "accent_color"); ok && v != "" {
+		accent = v
+	}
 
-	resp := settingsResponse{AppName: appName}
+	resp := settingsResponse{
+		AppName:        appName,
+		AccentColor:    accent,
+		ShowSystem:     settingBool(s, r, "dashboard_show_system", true),
+		ShowContainers: settingBool(s, r, "dashboard_show_containers", true),
+	}
 	if ext, ok, _ := s.store.GetSetting(r.Context(), "logo_ext"); ok && ext != "" {
 		version, _, _ := s.store.GetSetting(r.Context(), "logo_updated_at")
 		url := "/api/branding/logo?v=" + version
@@ -55,12 +72,23 @@ func (s *Server) currentSettings(r *http.Request) settingsResponse {
 	return resp
 }
 
+func settingBool(s *Server, r *http.Request, key string, def bool) bool {
+	v, ok, _ := s.store.GetSetting(r.Context(), key)
+	if !ok {
+		return def
+	}
+	return v == "true"
+}
+
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.currentSettings(r))
 }
 
 type updateSettingsRequest struct {
-	AppName string `json:"appName"`
+	AppName        string `json:"appName"`
+	AccentColor    string `json:"accentColor"`
+	ShowSystem     *bool  `json:"showSystem"`
+	ShowContainers *bool  `json:"showContainers"`
 }
 
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
@@ -77,11 +105,36 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("app name must be %d characters or fewer", maxAppNameLength))
 		return
 	}
-
 	if err := s.store.SetSetting(r.Context(), "app_name", name); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	accent := strings.TrimSpace(req.AccentColor)
+	if accent != "" {
+		if !accentColorPattern.MatchString(accent) {
+			writeError(w, http.StatusBadRequest, errors.New("accent color must be a 6-digit hex code like #ffb020"))
+			return
+		}
+		if err := s.store.SetSetting(r.Context(), "accent_color", accent); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
+	if req.ShowSystem != nil {
+		if err := s.store.SetSetting(r.Context(), "dashboard_show_system", strconv.FormatBool(*req.ShowSystem)); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+	if req.ShowContainers != nil {
+		if err := s.store.SetSetting(r.Context(), "dashboard_show_containers", strconv.FormatBool(*req.ShowContainers)); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
 	writeJSON(w, http.StatusOK, s.currentSettings(r))
 }
 

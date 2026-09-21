@@ -87,6 +87,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/containers/{id}/logs", s.handleLogs)
 	mux.HandleFunc("PUT /api/containers/{id}/nickname", auth.RequireRole(s.handleSetContainerNickname, store.RoleAdmin, store.RoleOperator))
 	mux.HandleFunc("DELETE /api/containers/{id}/nickname", auth.RequireRole(s.handleDeleteContainerNickname, store.RoleAdmin, store.RoleOperator))
+	// A shell in a container is as powerful as Scripts (arbitrary code
+	// execution), so it's gated the same way: admin only.
+	mux.HandleFunc("GET /api/containers/{id}/terminal", auth.RequireRole(s.handleContainerTerminal, store.RoleAdmin))
 
 	// --- Kubernetes ---
 	mux.HandleFunc("GET /api/k8s/status", s.handleK8sStatus)
@@ -123,6 +126,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/settings/logo", auth.RequireRole(s.handleUploadLogo, store.RoleAdmin))
 	mux.HandleFunc("DELETE /api/settings/logo", auth.RequireRole(s.handleDeleteLogo, store.RoleAdmin))
 	mux.HandleFunc("GET /api/branding/logo", s.handleServeLogo)
+
+	// --- Self-update (admin) ---
+	mux.HandleFunc("GET /api/updates/status", auth.RequireRole(s.handleUpdateStatus, store.RoleAdmin))
+	mux.HandleFunc("POST /api/updates/apply", auth.RequireRole(s.handleApplyUpdate, store.RoleAdmin))
 
 	authMW := &auth.Middleware{Store: s.store, PublicPaths: publicPaths}
 	return withCORS(s.cfg.PublicHost, withLogging(authMW.Wrap(mux)))
