@@ -8,6 +8,7 @@ var (
 	errNotAuthenticated         = errors.New("not authenticated")
 	errUnknownAutomationRule    = errors.New("unknown automation rule")
 	errScriptNameOrContentEmpty = errors.New("name and content are required")
+	errWorkflowNameEmpty        = errors.New("name is required")
 )
 
 const minPasswordLength = 8

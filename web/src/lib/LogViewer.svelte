@@ -42,28 +42,29 @@
 	.overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(0, 0, 0, 0.5);
+		background: rgba(0, 0, 0, 0.6);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		z-index: 10;
 	}
 	.panel {
-		background: var(--surface-1);
-		border: 1px solid var(--border);
-		border-radius: 10px;
+		background: var(--surface);
+		border: 1px solid var(--border2);
+		border-radius: 18px;
 		width: min(800px, 90vw);
 		height: min(600px, 80vh);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		box-shadow: var(--card-shadow);
 	}
 	header {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 12px 16px;
-		border-bottom: 1px solid var(--gridline);
+		padding: 14px 18px;
+		border-bottom: 1px solid var(--border);
 	}
 	h3 {
 		margin: 0;
@@ -72,17 +73,20 @@
 	header button {
 		background: none;
 		border: none;
-		color: var(--text-secondary);
+		color: var(--muted);
 		font-size: 14px;
+	}
+	header button:hover {
+		color: var(--accent);
 	}
 	.log {
 		flex: 1;
 		margin: 0;
-		padding: 12px 16px;
+		padding: 14px 18px;
 		overflow-y: auto;
-		font-family: ui-monospace, monospace;
+		font-family: var(--font-mono);
 		font-size: 12px;
 		white-space: pre-wrap;
-		color: var(--text-secondary);
+		color: var(--muted-strong);
 	}
 </style>

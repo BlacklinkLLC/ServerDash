@@ -1,7 +1,11 @@
 // Package config loads ServerDash's runtime configuration from environment variables.
 package config
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
 
 type Config struct {
 	// ListenAddr is the address the Go API server binds to, e.g. ":8080".
@@ -22,16 +26,26 @@ type Config struct {
 	// Kubeconfig is passed to kubectl as --kubeconfig; empty uses kubectl's
 	// own default resolution (KUBECONFIG env, ~/.kube/config, in-cluster).
 	Kubeconfig string
+	// DataDir holds files that aren't right for SQLite (an uploaded logo,
+	// today) — defaults to the SQLite database's own directory so both
+	// live under the same mounted volume without extra configuration.
+	DataDir string
+	// ComposeCmd is the command a workflow's "compose_up" block runs, split
+	// on spaces (e.g. "docker compose" or "podman-compose").
+	ComposeCmd []string
 }
 
 func Load() Config {
+	dbPath := getEnv("SERVERDASH_DB_PATH", "./serverdash.db")
 	return Config{
 		ListenAddr: getEnv("SERVERDASH_LISTEN_ADDR", ":8080"),
 		DockerHost: resolveDockerHost(),
 		PublicHost: getEnv("SERVERDASH_PUBLIC_HOST", "nova.blacklink.net"),
 		HostRoot:   getEnv("SERVERDASH_HOST_ROOT", ""),
-		DBPath:     getEnv("SERVERDASH_DB_PATH", "./serverdash.db"),
+		DBPath:     dbPath,
 		Kubeconfig: getEnv("SERVERDASH_KUBECONFIG", ""),
+		DataDir:    getEnv("SERVERDASH_DATA_DIR", filepath.Dir(dbPath)),
+		ComposeCmd: strings.Fields(getEnv("SERVERDASH_COMPOSE_CMD", "docker compose")),
 	}
 }
 

@@ -1,7 +1,8 @@
 <script>
 	import { api } from './api.js';
+	import BrandLogo from './BrandLogo.svelte';
 
-	let { onready } = $props();
+	let { branding, onready } = $props();
 
 	let username = $state('');
 	let password = $state('');
@@ -29,8 +30,11 @@
 </script>
 
 <div class="wrap">
-	<form class="card" onsubmit={submit}>
-		<h1>Welcome to ServerDash</h1>
+	<form class="auth-card" onsubmit={submit}>
+		<div class="brand">
+			<BrandLogo {branding} size={32} />
+			<h1>Welcome to {branding?.appName ?? 'ServerDash'}</h1>
+		</div>
 		<p class="subtitle">Create the first administrator account to get started.</p>
 
 		{#if error}
@@ -50,7 +54,7 @@
 			<input type="password" bind:value={confirm} autocomplete="new-password" required minlength="8" />
 		</label>
 
-		<button type="submit" disabled={submitting}>{submitting ? 'Creating…' : 'Create admin account'}</button>
+		<button class="btn primary" type="submit" disabled={submitting}>{submitting ? 'Creating…' : 'Create admin account'}</button>
 	</form>
 </div>
 
@@ -61,57 +65,48 @@
 		align-items: center;
 		justify-content: center;
 		padding: 16px;
+		background: var(--bg);
 	}
-	.card {
-		width: min(360px, 100%);
-		background: var(--surface-1);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		padding: 28px;
+	.auth-card {
+		width: min(380px, 100%);
+		background: var(--surface);
+		border: 1px solid var(--border2);
+		border-radius: 18px;
+		padding: 32px 30px 28px;
 		display: flex;
 		flex-direction: column;
-		gap: 14px;
+		gap: 16px;
+		box-shadow: var(--card-shadow);
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 12px;
 	}
 	h1 {
 		margin: 0;
-		font-size: 20px;
+		font-size: 19px;
 	}
 	.subtitle {
-		margin: 0;
-		color: var(--text-secondary);
-		font-size: 13px;
+		margin: -8px 0 0;
+		color: var(--muted);
+		font-size: 12px;
 	}
 	label {
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
-		font-size: 12px;
-		color: var(--text-muted);
+		gap: 6px;
+		font-size: 11px;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--muted);
 	}
-	input {
-		font: inherit;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 8px 10px;
-		color: var(--text-primary);
-	}
-	button {
-		margin-top: 8px;
-		background: var(--sequential-500);
-		border: none;
-		border-radius: 6px;
-		padding: 10px;
-		color: white;
-		font-weight: 600;
-		font-size: 13px;
-	}
-	button:disabled {
-		opacity: 0.6;
+	button.primary {
+		margin-top: 6px;
 	}
 	.error {
 		margin: 0;
-		color: var(--status-critical);
+		color: var(--danger);
 		font-size: 13px;
 	}
 </style>

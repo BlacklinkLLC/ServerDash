@@ -90,4 +90,27 @@ export const api = {
 	deleteScript: (id) => del(`/api/scripts/${id}`),
 	runScript: (id) => post(`/api/scripts/${id}/run`),
 	scriptRuns: (id) => request(`/api/scripts/${id}/runs`),
+
+	// --- Workflows: block-based deployment automations (admin) ---
+	workflows: () => request('/api/workflows'),
+	createWorkflow: (workflow) => post('/api/workflows', workflow),
+	updateWorkflow: (id, workflow) => put(`/api/workflows/${id}`, workflow),
+	deleteWorkflow: (id) => del(`/api/workflows/${id}`),
+	runWorkflow: (id) => post(`/api/workflows/${id}/run`),
+	workflowRuns: (id) => request(`/api/workflows/${id}/runs`),
+
+	// --- Settings / branding ---
+	settings: () => request('/api/settings'),
+	updateSettings: (appName) => put('/api/settings', { appName }),
+	uploadLogo: async (file) => {
+		const form = new FormData();
+		form.append('logo', file);
+		const res = await fetch('/api/settings/logo', { method: 'POST', credentials: 'include', body: form });
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			throw new ApiError(res.status, body.error || `${res.status} ${res.statusText}`);
+		}
+		return res.json();
+	},
+	deleteLogo: () => del('/api/settings/logo'),
 };

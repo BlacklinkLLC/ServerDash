@@ -70,7 +70,7 @@
 		<p class="error">{error}</p>
 	{/if}
 
-	<table>
+	<table class="token-table">
 		<thead>
 			<tr>
 				<th>Username</th>
@@ -96,9 +96,9 @@
 					</td>
 					<td class="muted">{new Date(u.createdAt).toLocaleDateString()}</td>
 					<td class="actions">
-						<button onclick={() => (resettingFor = u)}>Reset password</button>
+						<button class="btn subtle" onclick={() => (resettingFor = u)}>Reset password</button>
 						{#if u.id !== currentUserId}
-							<button class="danger" onclick={() => remove(u)}>Delete</button>
+							<button class="btn danger" onclick={() => remove(u)}>Delete</button>
 						{/if}
 					</td>
 				</tr>
@@ -110,8 +110,8 @@
 		<form class="inline-form" onsubmit={submitReset}>
 			<span>New password for <strong>{resettingFor.username}</strong>:</span>
 			<input type="password" bind:value={resetPassword} minlength="8" required autofocus />
-			<button type="submit">Set</button>
-			<button type="button" onclick={() => (resettingFor = null)}>Cancel</button>
+			<button class="btn primary" type="submit">Set</button>
+			<button class="btn subtle" type="button" onclick={() => (resettingFor = null)}>Cancel</button>
 		</form>
 	{/if}
 
@@ -124,7 +124,7 @@
 			<option value="operator">operator</option>
 			<option value="viewer">viewer</option>
 		</select>
-		<button type="submit">Create</button>
+		<button class="btn primary" type="submit">Create</button>
 	</form>
 </div>
 
@@ -138,61 +138,16 @@
 		margin: 0;
 		font-size: 14px;
 	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--surface-1);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		overflow: hidden;
-	}
-	th,
-	td {
-		text-align: left;
-		padding: 10px 14px;
-		font-size: 13px;
-		border-bottom: 1px solid var(--gridline);
-	}
-	th {
-		color: var(--text-muted);
-		font-weight: 600;
-		text-transform: uppercase;
-		font-size: 11px;
-	}
-	tr:last-child td {
-		border-bottom: none;
-	}
 	.muted {
-		color: var(--text-secondary);
+		color: var(--muted-strong);
 	}
 	.error {
-		color: var(--status-critical);
+		color: var(--danger);
 		font-size: 13px;
-	}
-	select,
-	input {
-		font: inherit;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 6px 8px;
-		color: var(--text-primary);
 	}
 	.actions {
 		display: flex;
 		gap: 6px;
-	}
-	button {
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 6px 10px;
-		font-size: 12px;
-		color: var(--text-primary);
-	}
-	button.danger {
-		color: var(--status-critical);
-		border-color: var(--status-critical);
 	}
 	.inline-form {
 		display: flex;

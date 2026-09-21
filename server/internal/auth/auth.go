@@ -66,7 +66,13 @@ func UserFromContext(ctx context.Context) (store.User, bool) {
 // Middleware authenticates every request against the session cookie and,
 // on success, injects the user into the request context. It's applied to
 // the whole API except the handful of pre-auth routes (setup status,
-// login) that register themselves before it via a path allowlist.
+// login, public branding) that register themselves before it via an
+// allowlist.
+//
+// Entries are "METHOD /path" (matching the mux.HandleFunc pattern syntax),
+// not bare paths — a path that has both a public GET and an
+// authenticated/admin-only PUT (like /api/settings) would otherwise leak
+// its write method too if the bypass only checked the path.
 type Middleware struct {
 	Store       *store.Store
 	PublicPaths map[string]bool
@@ -74,7 +80,7 @@ type Middleware struct {
 
 func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if m.PublicPaths[r.URL.Path] {
+		if m.PublicPaths[r.Method+" "+r.URL.Path] {
 			next.ServeHTTP(w, r)
 			return
 		}

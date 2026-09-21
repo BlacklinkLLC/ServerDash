@@ -7,16 +7,28 @@
 	import AdminPanel from './lib/admin/AdminPanel.svelte';
 	import SetupPage from './lib/SetupPage.svelte';
 	import LoginPage from './lib/LoginPage.svelte';
+	import BrandLogo from './lib/BrandLogo.svelte';
 
 	// 'loading' | 'setup' | 'login' | 'ready'
 	let authState = $state('loading');
 	let user = $state(null);
+	let branding = $state({ appName: 'ServerDash', logoUrl: null });
 
 	let page = $state('dashboard'); // 'dashboard' | 'kubernetes' | 'admin'
 
 	let snapshot = $state(null);
 	let containers = $state([]);
 	let error = $state(null);
+
+	async function loadBranding() {
+		try {
+			branding = await api.settings();
+		} catch {
+			// Falls back to the default name/no logo — branding is cosmetic,
+			// never worth blocking the rest of the app over.
+		}
+		document.title = branding.appName;
+	}
 
 	async function resolveAuth() {
 		try {
@@ -65,7 +77,7 @@
 
 	let timer;
 	onMount(async () => {
-		await resolveAuth();
+		await Promise.all([loadBranding(), resolveAuth()]);
 	});
 	$effect(() => {
 		if (authState === 'ready') {
@@ -83,12 +95,15 @@
 {#if authState === 'loading'}
 	<div class="center"><p class="muted">Loading…</p></div>
 {:else if authState === 'setup'}
-	<SetupPage onready={onAuthed} />
+	<SetupPage {branding} onready={onAuthed} />
 {:else if authState === 'login'}
-	<LoginPage onready={onAuthed} />
+	<LoginPage {branding} onready={onAuthed} />
 {:else}
 	<header>
-		<h1>ServerDash</h1>
+		<div class="brand">
+			<BrandLogo {branding} size={22} />
+			<h1>{branding.appName}</h1>
+		</div>
 		<nav>
 			<button class:active={page === 'dashboard'} onclick={() => (page = 'dashboard')}>Dashboard</button>
 			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}>Kubernetes</button>
@@ -98,13 +113,13 @@
 		</nav>
 		<div class="user">
 			<span>{user.username} <span class="muted">({user.role})</span></span>
-			<button onclick={logout}>Sign out</button>
+			<button class="btn subtle" onclick={logout}>Sign out</button>
 		</div>
 	</header>
 
 	<main>
 		{#if error}
-			<p class="error">Couldn't reach the ServerDash API: {error}</p>
+			<p class="error">Couldn't reach {branding.appName}'s API: {error}</p>
 		{/if}
 
 		{#if page === 'dashboard'}
@@ -113,7 +128,7 @@
 		{:else if page === 'kubernetes'}
 			<KubernetesView {canOperate} />
 		{:else if page === 'admin'}
-			<AdminPanel currentUserId={user.id} />
+			<AdminPanel currentUserId={user.id} {branding} onbrandingchange={(b) => (branding = b)} />
 		{/if}
 	</main>
 {/if}
@@ -126,18 +141,24 @@
 		justify-content: center;
 	}
 	.muted {
-		color: var(--text-muted);
+		color: var(--muted);
 	}
 	header {
 		display: flex;
 		align-items: center;
 		gap: 24px;
 		padding: 16px 24px;
-		border-bottom: 1px solid var(--gridline);
+		border-bottom: 1px solid var(--border);
+		background: var(--surface);
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 	}
 	h1 {
 		margin: 0;
-		font-size: 18px;
+		font-size: 17px;
 		letter-spacing: -0.01em;
 	}
 	nav {
@@ -148,40 +169,33 @@
 	nav button {
 		background: none;
 		border: none;
-		border-radius: 6px;
-		padding: 6px 12px;
-		font-size: 13px;
-		color: var(--text-secondary);
+		border-radius: 10px;
+		padding: 7px 14px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--muted);
 	}
 	nav button.active {
-		background: var(--surface-1);
-		color: var(--text-primary);
-		font-weight: 600;
+		background: var(--accent-soft);
+		color: var(--accent);
+		font-weight: 500;
 	}
 	.user {
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		font-size: 13px;
-	}
-	.user button {
-		background: var(--surface-1);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 5px 10px;
 		font-size: 12px;
-		color: var(--text-primary);
 	}
 	main {
-		max-width: 960px;
+		max-width: 980px;
 		margin: 0 auto;
-		padding: 24px;
+		padding: 28px 24px;
 		display: flex;
 		flex-direction: column;
 		gap: 24px;
 	}
 	.error {
-		color: var(--status-critical);
+		color: var(--danger);
 		font-size: 13px;
 	}
 </style>

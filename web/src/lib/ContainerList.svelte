@@ -24,7 +24,7 @@
 
 <section>
 	<h2>Services</h2>
-	<table>
+	<table class="token-table">
 		<thead>
 			<tr>
 				<th>Name</th>
@@ -57,12 +57,12 @@
 					<td class="muted">{c.ports.map((p) => `${p.publicPort || ''}${p.publicPort ? ':' : ''}${p.privatePort}`).join(', ') || '—'}</td>
 					<td class="actions">
 						{#if canOperate}
-							<button disabled={pending.has(c.id)} onclick={() => run(c.state === 'running' ? 'stop' : 'start', c.id)}>
+							<button class="btn subtle" disabled={pending.has(c.id)} onclick={() => run(c.state === 'running' ? 'stop' : 'start', c.id)}>
 								{c.state === 'running' ? 'Stop' : 'Start'}
 							</button>
-							<button disabled={pending.has(c.id)} onclick={() => run('restart', c.id)}>Restart</button>
+							<button class="btn subtle" disabled={pending.has(c.id)} onclick={() => run('restart', c.id)}>Restart</button>
 						{/if}
-						<button onclick={() => (logsFor = c)}>Logs</button>
+						<button class="btn subtle" onclick={() => (logsFor = c)}>Logs</button>
 					</td>
 				</tr>
 			{/each}
@@ -77,50 +77,13 @@
 <style>
 	h2 {
 		margin: 0 0 12px;
-		font-size: 20px;
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--surface-1);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		overflow: hidden;
-	}
-	th,
-	td {
-		text-align: left;
-		padding: 10px 14px;
-		font-size: 13px;
-		border-bottom: 1px solid var(--gridline);
-	}
-	th {
-		color: var(--text-muted);
-		font-weight: 600;
-		text-transform: uppercase;
-		font-size: 11px;
-		letter-spacing: 0.02em;
-	}
-	tr:last-child td {
-		border-bottom: none;
+		font-size: 18px;
 	}
 	.muted {
-		color: var(--text-secondary);
+		color: var(--muted-strong);
 	}
 	.actions {
 		display: flex;
 		gap: 6px;
-	}
-	.actions button {
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 5px 10px;
-		font-size: 12px;
-		color: var(--text-primary);
-	}
-	.actions button:disabled {
-		opacity: 0.5;
-		cursor: default;
 	}
 </style>

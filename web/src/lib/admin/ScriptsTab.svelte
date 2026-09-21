@@ -70,7 +70,7 @@
 		<p class="error">{error}</p>
 	{/if}
 
-	<table>
+	<table class="token-table">
 		<thead>
 			<tr>
 				<th>Name</th>
@@ -86,10 +86,12 @@
 					<td class="muted mono">{sc.schedule || 'manual only'}</td>
 					<td class="muted">{sc.enabled ? 'yes' : 'no'}</td>
 					<td class="actions">
-						<button disabled={running.has(sc.id)} onclick={() => run(sc)}>{running.has(sc.id) ? 'Running…' : 'Run now'}</button>
-						<button onclick={() => showRuns(sc)}>History</button>
-						<button onclick={() => (editing = { ...sc })}>Edit</button>
-						<button class="danger" onclick={() => remove(sc)}>Delete</button>
+						<button class="btn subtle" disabled={running.has(sc.id)} onclick={() => run(sc)}>
+							{running.has(sc.id) ? 'Running…' : 'Run now'}
+						</button>
+						<button class="btn subtle" onclick={() => showRuns(sc)}>History</button>
+						<button class="btn subtle" onclick={() => (editing = { ...sc })}>Edit</button>
+						<button class="btn danger" onclick={() => remove(sc)}>Delete</button>
 					</td>
 				</tr>
 				{#if expandedRuns === sc.id}
@@ -137,12 +139,12 @@
 				Enabled
 			</label>
 			<div class="row">
-				<button type="submit">Save</button>
-				<button type="button" onclick={() => (editing = null)}>Cancel</button>
+				<button class="btn primary" type="submit">Save</button>
+				<button class="btn subtle" type="button" onclick={() => (editing = null)}>Cancel</button>
 			</div>
 		</form>
 	{:else}
-		<button onclick={startNew}>New script</button>
+		<button class="btn primary" onclick={startNew}>New script</button>
 	{/if}
 </div>
 
@@ -152,86 +154,49 @@
 		flex-direction: column;
 		gap: 16px;
 	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--surface-1);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		overflow: hidden;
-	}
-	th,
-	td {
-		text-align: left;
-		padding: 10px 14px;
-		font-size: 13px;
-		border-bottom: 1px solid var(--gridline);
-	}
-	th {
-		color: var(--text-muted);
-		font-weight: 600;
-		text-transform: uppercase;
-		font-size: 11px;
-	}
 	.muted {
-		color: var(--text-secondary);
+		color: var(--muted-strong);
 	}
 	.mono {
-		font-family: ui-monospace, monospace;
+		font-family: var(--font-mono);
 		font-size: 12px;
 	}
 	.error {
-		color: var(--status-critical);
+		color: var(--danger);
 		font-size: 13px;
 	}
 	.actions {
 		display: flex;
 		gap: 6px;
 	}
-	button {
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 6px 10px;
-		font-size: 12px;
-		color: var(--text-primary);
-	}
-	button.danger {
-		color: var(--status-critical);
-		border-color: var(--status-critical);
-	}
 	.editor {
-		background: var(--surface-1);
+		background: var(--surface);
 		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 16px;
+		border-radius: 16px;
+		padding: 20px;
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: 12px;
 	}
 	.editor h3 {
 		margin: 0;
-		font-size: 14px;
+		font-size: 15px;
 	}
 	label {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
-		font-size: 12px;
-		color: var(--text-muted);
+		font-size: 11px;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--muted);
 	}
 	label.checkbox {
 		flex-direction: row;
 		align-items: center;
-	}
-	input,
-	textarea {
-		font: inherit;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 6px 8px;
-		color: var(--text-primary);
+		text-transform: none;
+		letter-spacing: normal;
+		font-size: 12px;
 	}
 	.row {
 		display: flex;
@@ -253,18 +218,18 @@
 		margin-bottom: 4px;
 	}
 	.ok {
-		color: var(--status-good);
+		color: var(--success);
 		font-weight: 600;
 	}
 	.fail {
-		color: var(--status-critical);
+		color: var(--danger);
 		font-weight: 600;
 	}
 	.runs pre {
 		margin: 0;
-		background: var(--surface-2);
-		border-radius: 6px;
-		padding: 8px 10px;
+		background: var(--sur3);
+		border-radius: 8px;
+		padding: 10px 12px;
 		font-size: 11px;
 		white-space: pre-wrap;
 		max-height: 200px;

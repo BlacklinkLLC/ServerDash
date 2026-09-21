@@ -40,14 +40,20 @@ func New(cfg config.Config, docker *containers.Client, st *store.Store, kube *ku
 	}
 }
 
-// publicPaths bypass authentication entirely: health checks, and the two
+// publicPaths bypass authentication entirely: health checks; the two
 // endpoints that exist specifically to let an unauthenticated caller become
-// authenticated (first-run setup, login).
+// authenticated (first-run setup, login); and branding (read-only), so the
+// setup/login screens can render the operator's app name and logo before
+// anyone has signed in. Keyed by "METHOD /path" (not bare path) so a route
+// with both a public GET and an admin-only PUT/POST on the same path — like
+// /api/settings — only exposes the read.
 var publicPaths = map[string]bool{
-	"/api/health":       true,
-	"/api/setup/status": true,
-	"/api/setup":        true,
-	"/api/auth/login":   true,
+	"GET /api/health":        true,
+	"GET /api/setup/status":  true,
+	"POST /api/setup":        true,
+	"POST /api/auth/login":   true,
+	"GET /api/settings":      true,
+	"GET /api/branding/logo": true,
 }
 
 func (s *Server) Routes() http.Handler {
@@ -102,6 +108,21 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/scripts/{id}", auth.RequireRole(s.handleDeleteScript, store.RoleAdmin))
 	mux.HandleFunc("POST /api/scripts/{id}/run", auth.RequireRole(s.handleRunScript, store.RoleAdmin))
 	mux.HandleFunc("GET /api/scripts/{id}/runs", auth.RequireRole(s.handleListScriptRuns, store.RoleAdmin))
+
+	// --- Workflows: block-based scheduled deployment automations (admin) ---
+	mux.HandleFunc("GET /api/workflows", auth.RequireRole(s.handleListWorkflows, store.RoleAdmin))
+	mux.HandleFunc("POST /api/workflows", auth.RequireRole(s.handleCreateWorkflow, store.RoleAdmin))
+	mux.HandleFunc("PUT /api/workflows/{id}", auth.RequireRole(s.handleUpdateWorkflow, store.RoleAdmin))
+	mux.HandleFunc("DELETE /api/workflows/{id}", auth.RequireRole(s.handleDeleteWorkflow, store.RoleAdmin))
+	mux.HandleFunc("POST /api/workflows/{id}/run", auth.RequireRole(s.handleRunWorkflow, store.RoleAdmin))
+	mux.HandleFunc("GET /api/workflows/{id}/runs", auth.RequireRole(s.handleListWorkflowRuns, store.RoleAdmin))
+
+	// --- Settings / branding ---
+	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
+	mux.HandleFunc("PUT /api/settings", auth.RequireRole(s.handleUpdateSettings, store.RoleAdmin))
+	mux.HandleFunc("POST /api/settings/logo", auth.RequireRole(s.handleUploadLogo, store.RoleAdmin))
+	mux.HandleFunc("DELETE /api/settings/logo", auth.RequireRole(s.handleDeleteLogo, store.RoleAdmin))
+	mux.HandleFunc("GET /api/branding/logo", s.handleServeLogo)
 
 	authMW := &auth.Middleware{Store: s.store, PublicPaths: publicPaths}
 	return withCORS(s.cfg.PublicHost, withLogging(authMW.Wrap(mux)))

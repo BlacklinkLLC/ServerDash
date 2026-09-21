@@ -45,35 +45,37 @@
 		gap: 6px;
 	}
 	.nickname {
-		font-weight: 600;
+		font-weight: 700;
+		font-family: var(--font-display);
 	}
 	.real-name {
-		color: var(--text-muted);
+		color: var(--muted);
 		font-size: 11px;
 	}
 	.real-name.primary {
-		color: var(--text-primary);
+		color: var(--text);
 		font-size: inherit;
 		font-weight: 400;
 	}
 	.edit-btn {
 		background: none;
 		border: none;
-		color: var(--text-muted);
+		color: var(--muted);
 		font-size: 11px;
 		padding: 0 2px;
 		opacity: 0;
 	}
 	.label:hover .edit-btn {
 		opacity: 1;
+		color: var(--accent);
 	}
 	.edit input {
 		font: inherit;
-		background: var(--surface-2);
+		background: var(--sur2);
 		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 2px 6px;
-		color: var(--text-primary);
+		border-radius: 6px;
+		padding: 3px 8px;
+		color: var(--text);
 		width: 160px;
 	}
 </style>

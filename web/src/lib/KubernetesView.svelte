@@ -79,7 +79,7 @@
 			<p class="error">{error}</p>
 		{/if}
 
-		<table>
+		<table class="token-table">
 			<thead>
 				<tr>
 					<th>Pod</th>
@@ -113,12 +113,12 @@
 						<td class="muted">{p.phase}</td>
 						<td class="muted">{p.ready}</td>
 						<td class="muted">{p.restartCount}</td>
-						<td class="muted mono">{p.image}</td>
+						<td class="muted">{p.image}</td>
 						<td class="actions">
 							{#if canOperate}
-								<button disabled={pending.has(p.namespace + '/' + p.name)} onclick={() => restart(p)}>Restart</button>
+								<button class="btn subtle" disabled={pending.has(p.namespace + '/' + p.name)} onclick={() => restart(p)}>Restart</button>
 							{/if}
-							<button onclick={() => (logsFor = p)}>Logs</button>
+							<button class="btn subtle" onclick={() => (logsFor = p)}>Logs</button>
 						</td>
 					</tr>
 				{/each}
@@ -138,74 +138,29 @@
 <style>
 	h2 {
 		margin: 0 0 12px;
-		font-size: 20px;
+		font-size: 18px;
 	}
 	.muted {
-		color: var(--text-secondary);
-		font-size: 13px;
+		color: var(--muted-strong);
+		font-size: 12px;
 	}
 	.error {
-		color: var(--status-critical);
+		color: var(--danger);
 		font-size: 13px;
 	}
 	.context-picker {
 		display: block;
 		font-size: 12px;
-		color: var(--text-muted);
+		color: var(--muted);
 		margin-bottom: 12px;
 	}
 	.context-picker select {
 		margin-left: 6px;
-		font: inherit;
-		background: var(--surface-1);
-		border: 1px solid var(--border);
-		border-radius: 6px;
 		padding: 4px 8px;
-		color: var(--text-primary);
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--surface-1);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		overflow: hidden;
-	}
-	th,
-	td {
-		text-align: left;
-		padding: 10px 14px;
-		font-size: 13px;
-		border-bottom: 1px solid var(--gridline);
-	}
-	th {
-		color: var(--text-muted);
-		font-weight: 600;
-		text-transform: uppercase;
-		font-size: 11px;
-		letter-spacing: 0.02em;
-	}
-	tr:last-child td {
-		border-bottom: none;
-	}
-	.mono {
-		font-family: ui-monospace, monospace;
-		font-size: 11px;
+		font-size: 12px;
 	}
 	.actions {
 		display: flex;
 		gap: 6px;
-	}
-	.actions button {
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 5px 10px;
-		font-size: 12px;
-		color: var(--text-primary);
-	}
-	.actions button:disabled {
-		opacity: 0.5;
-		cursor: default;
 	}
 </style>

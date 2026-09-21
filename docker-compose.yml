@@ -20,6 +20,9 @@ services:
       SERVERDASH_HOST_ROOT: /rootfs
       # Only needed if you uncomment the kubeconfig mount below.
       SERVERDASH_KUBECONFIG: "${SERVERDASH_KUBECONFIG:-}"
+      # Used by a workflow's "Rebuild & Run" block; see the workflow mount
+      # note further down for the rest of what that block needs.
+      SERVERDASH_COMPOSE_CMD: "${SERVERDASH_COMPOSE_CMD:-docker compose}"
     volumes:
       # Users, sessions, nicknames, automation rules, and scripts (SQLite).
       - serverdash-data:/data
@@ -48,6 +51,25 @@ services:
       # the dashboard. Leave both commented out and ServerDash just reports
       # Kubernetes as unavailable.
       # - ${KUBECONFIG:-~/.kube/config}:/kubeconfig:ro
+      #
+      # Workflow blocks (optional): git_pull and compose_up run against a
+      # directory you name in the workflow, e.g. "/opt/myapp" — that path
+      # has to exist inside *this* container too, at the same path it has
+      # on the host, so mount whatever parent directory holds your deployed
+      # projects (not /tmp — see the note on security_opt below).
+      # - /opt:/opt
+    # On SELinux-enforcing hosts (Fedora/RHEL/CentOS) only: the mounted
+    # directories above need :Z (e.g. "/opt:/opt:Z") to be readable at all.
+    # That alone isn't enough for the git_pull/compose_up blocks specifically
+    # — SELinux's container policy separately blocks a container's own
+    # nested `docker`/`git` CLI calls against the mounted docker.sock, even
+    # though the dashboard's own container list/start/stop/restart (which
+    # goes straight to the Engine API, not through the CLI) works fine
+    # either way. If you want those two workflow block types, uncomment
+    # this — it runs ServerDash unconfined, weakening the isolation SELinux
+    # normally gives a container; skip it if you don't need them.
+    # security_opt:
+    #   - label=disable
 
 volumes:
   serverdash-data:

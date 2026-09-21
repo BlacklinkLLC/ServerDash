@@ -2,7 +2,7 @@
 	let { label, value, percent = null } = $props();
 </script>
 
-<div class="tile">
+<div class="tile app-card">
 	<span class="label">{label}</span>
 	<span class="value">{value}</span>
 	{#if percent !== null}
@@ -17,35 +17,36 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-		background: var(--surface-1);
+		background: var(--surface);
 		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 16px 18px;
+		border-radius: 14px;
+		padding: 20px 18px 16px;
 		min-width: 160px;
 	}
 	.label {
-		font-size: 12px;
-		font-weight: 600;
-		letter-spacing: 0.02em;
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: var(--text-muted);
+		color: var(--muted);
 	}
 	.value {
-		font-size: 26px;
-		font-weight: 600;
-		color: var(--text-primary);
+		font-family: var(--font-display);
+		font-size: 22px;
+		font-weight: 800;
+		color: var(--text);
 		font-variant-numeric: proportional-nums;
 	}
 	.bar-track {
 		height: 6px;
 		border-radius: 3px;
-		background: var(--sequential-100);
+		background: var(--sur2);
 		overflow: hidden;
 		margin-top: 4px;
 	}
 	.bar-fill {
 		height: 100%;
-		background: var(--sequential-500);
+		background: var(--accent);
 		border-radius: 3px;
 		transition: width 0.3s ease;
 	}

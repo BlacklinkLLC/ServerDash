@@ -68,6 +68,33 @@ CREATE TABLE IF NOT EXISTS script_runs (
 	output      TEXT NOT NULL DEFAULT '',
 	triggered_by TEXT NOT NULL DEFAULT 'manual'
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+	key   TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS workflows (
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	name         TEXT NOT NULL,
+	trigger_time TEXT NOT NULL,             -- "HH:MM", 24-hour
+	trigger_tz   TEXT NOT NULL DEFAULT 'UTC', -- IANA zone, e.g. America/Chicago
+	blocks       TEXT NOT NULL,             -- JSON array of block objects, run in order
+	enabled      INTEGER NOT NULL DEFAULT 1,
+	created_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS workflow_runs (
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	workflow_id  INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+	started_at   DATETIME NOT NULL,
+	finished_at  DATETIME,
+	success      INTEGER,
+	log          TEXT NOT NULL DEFAULT '',
+	triggered_by TEXT NOT NULL DEFAULT 'manual'
+);
 `
 
 // Open creates (if needed) and migrates the SQLite database at path.

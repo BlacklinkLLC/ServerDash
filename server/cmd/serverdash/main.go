@@ -8,6 +8,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	_ "time/tzdata" // embeds the IANA zone database in the binary: the Alpine base image doesn't ship it, and without this, a workflow's "CRON_TZ=America/Chicago ..." trigger silently fails to register
 
 	"serverdash/internal/api"
 	"serverdash/internal/automation"
@@ -34,7 +35,7 @@ func main() {
 
 	kubeClient := kubernetes.New(cfg.Kubeconfig)
 
-	runner := automation.NewRunner(db, dockerClient)
+	runner := automation.NewRunner(db, dockerClient, cfg.ComposeCmd)
 	runner.Start(context.Background())
 	defer runner.Stop()
 

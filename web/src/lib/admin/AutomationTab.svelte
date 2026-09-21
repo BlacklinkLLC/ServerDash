@@ -95,7 +95,7 @@
 				Cron schedule
 				<input bind:value={pruneSchedule} onchange={() => savePrune(rules.prune?.enabled ?? false, pruneSchedule)} placeholder="0 3 * * *" />
 			</label>
-			<button onclick={pruneNow} disabled={pruning}>{pruning ? 'Pruning…' : 'Run now'}</button>
+			<button class="btn subtle" onclick={pruneNow} disabled={pruning}>{pruning ? 'Pruning…' : 'Run now'}</button>
 		</div>
 		{#if pruneReport}
 			<p class="muted">
@@ -132,7 +132,7 @@
 				<input bind:value={backupDest} placeholder="/backups" />
 			</label>
 		</div>
-		<button onclick={() => saveBackup(rules.backup?.enabled ?? false, backupSchedule)}>Save backup config</button>
+		<button class="btn subtle" onclick={() => saveBackup(rules.backup?.enabled ?? false, backupSchedule)}>Save backup config</button>
 	</section>
 </div>
 
@@ -143,10 +143,10 @@
 		gap: 16px;
 	}
 	.rule {
-		background: var(--surface-1);
+		background: var(--surface);
 		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 16px;
+		border-radius: 14px;
+		padding: 18px;
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
@@ -162,11 +162,11 @@
 	}
 	.muted {
 		margin: 0;
-		color: var(--text-secondary);
+		color: var(--muted);
 		font-size: 12px;
 	}
 	.error {
-		color: var(--status-critical);
+		color: var(--danger);
 		font-size: 13px;
 	}
 	.toggle {
@@ -174,7 +174,7 @@
 		align-items: center;
 		gap: 6px;
 		font-size: 12px;
-		color: var(--text-secondary);
+		color: var(--muted);
 	}
 	.row {
 		display: flex;
@@ -193,25 +193,12 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
-		font-size: 12px;
-		color: var(--text-muted);
+		font-size: 11px;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--muted);
 	}
-	input,
-	textarea {
-		font: inherit;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 6px 8px;
-		color: var(--text-primary);
-	}
-	button {
+	.btn.subtle {
 		align-self: flex-start;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 7px 12px;
-		font-size: 12px;
-		color: var(--text-primary);
 	}
 </style>

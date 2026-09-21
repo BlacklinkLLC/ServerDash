@@ -2,7 +2,9 @@
 
 A self-hosted dashboard for monitoring servers and controlling their Docker/Podman
 containers and Kubernetes pods. Deployed as a single container, served at
-**nova.blacklink.net**.
+**nova.blacklink.net**. Visual design matches Blacklink's NOVA design system
+(dark, amber accent, Syne/DM Mono type) — see `web/src/app.css`. Both the app name
+and logo are runtime-configurable (Admin → Branding), for white-labeling.
 
 ## Architecture
 
@@ -13,10 +15,13 @@ containers and Kubernetes pods. Deployed as a single container, served at
   - Kubernetes pod listing/restart/logs by shelling out to `kubectl` — reuses
     whatever kubeconfig/contexts/auth plugins are already set up rather than
     reimplementing cluster auth.
-  - Auth (session cookies, bcrypt), users/roles, nicknames, automation rules, and
-    scripts, all persisted in an embedded SQLite database (`internal/store`).
-  - Built-in automation + user script scheduling via a cron runner
-    (`internal/automation`).
+  - Auth (session cookies, bcrypt), users/roles, nicknames, automation rules,
+    scripts, workflows, and branding, all persisted in an embedded SQLite
+    database (`internal/store`).
+  - Built-in automation + user script + workflow scheduling via a cron runner
+    (`internal/automation`), including per-workflow timezones.
+  - `internal/workflow`: the block-based deployment automation language — see
+    [Workflows](#workflows-block-based-deployment-automation) below.
   - Exposes all of it through an authenticated HTTP + WebSocket API.
 - **`web/`** — Svelte + Vite dashboard, served by a small Express server that also
   proxies `/api` (including WebSocket log streams) through to the Go backend, so
@@ -64,6 +69,9 @@ real deployment. Open it and create the admin account to finish setup.
   local minikube/kind cluster additionally needs `network_mode: host`, since their
   kubeconfigs reference the host's loopback address — a real remote cluster's
   kubeconfig (embedded certs, a real endpoint) doesn't have this problem.
+- Has a commented-out mount + `security_opt` for the workflow feature's
+  `git_pull`/`compose_up` blocks — see
+  [Workflows](#workflows-block-based-deployment-automation).
 
 ### Local development
 
@@ -86,6 +94,49 @@ Installs Docker (or Podman with `--runtime podman`), clones ServerDash to
 status serverdash`). Safe to re-run to upgrade — see `install.sh --help` for
 options (`--dir`, `--public-host`, `--port`, `--branch`, `--no-start`).
 
+## Workflows: block-based deployment automation
+
+Admin → Workflows builds scheduled automations out of a small set of fixed,
+typed blocks — not a general scripting language, so there's nothing to sandbox
+beyond what each block already does. A trigger ("at 00:00 America/Chicago")
+plus an ordered list of blocks, e.g. the canonical case — nightly redeploy of a
+git-based service:
+
+1. **Git Pull** — `dir: /opt/myapp`
+2. **Rebuild & Run (docker compose up)** — `dir: /opt/myapp`, `build: true`
+
+Blocks run top to bottom and stop at the first failure; every run (scheduled or
+"Run now") is logged block-by-block in the workflow's history. Available blocks:
+Git Pull, Rebuild & Run (`docker compose up -d [--build]`), Restart Container,
+Run Command (arbitrary shell, optional working directory), Wait.
+
+**This needs real filesystem access that the default `docker-compose.yml`
+doesn't grant**, because ServerDash itself runs containerized: a workflow's
+`dir` has to exist inside *ServerDash's own container*, at the same path it
+has on the host, for `git`/`docker compose` (both shelled out to, bundled in
+the image) to find it. Uncomment the commented-out mount in
+`docker-compose.yml` and point it at whatever parent directory holds your
+deployed projects (e.g. `/opt:/opt`) — never `/tmp`, which under a
+systemd-managed Docker daemon with `PrivateTmp` resolves to dockerd's own
+private empty tmpfs, not the host `/tmp` your shell sees, so a mount from
+there silently binds the wrong directory.
+
+Two more things that come up specifically on SELinux-enforcing hosts
+(Fedora/RHEL/CentOS — not an issue elsewhere):
+- Bind-mounted directories need `:Z` to be readable at all (same as the
+  kubeconfig mount above).
+- `:Z` alone isn't enough for these two block types specifically: SELinux's
+  container policy separately blocks a container's own nested `docker`/`git`
+  CLI calls against the mounted socket, even though the dashboard's normal
+  container controls (start/stop/restart, which go straight to the Engine
+  API, not through the CLI) are unaffected. If you want `git_pull`/
+  `compose_up`, uncomment `security_opt: label=disable` in
+  `docker-compose.yml` — it runs ServerDash unconfined, which is a real
+  reduction in isolation, so only do it if you're using those two blocks.
+  (`git`'s separate "dubious ownership" check, since the container runs as
+  root over a host-user-owned directory, is handled for you — no
+  `safe.directory` config needed.)
+
 ## Implemented so far
 
 - Server overview: hostname, platform, uptime, load average
@@ -100,6 +151,10 @@ options (`--dir`, `--public-host`, `--port`, `--branch`, `--no-start`).
   tar+gzip backups with retention
 - Scripts: admin-authored shell scripts, run on-demand or on a cron schedule, with
   run history and captured output
+- Workflows: block-based scheduled deployment automation (git pull, rebuild/run
+  via compose, restart a container, run a command, wait) — see above
+- Branding: rename the app and swap in your own logo from Admin → Branding, shown
+  everywhere including the sign-in screen
 - `install.sh` for a one-line install on a bare server
 
 Everything below is the product roadmap — features to build toward, not yet

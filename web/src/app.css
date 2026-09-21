@@ -1,49 +1,33 @@
+/* Design tokens matched to nova.blacklink.net (Blacklink's NOVA design
+   system) — dark-first, amber accent, Syne + DM Mono type. */
 :root {
-	color-scheme: light;
-	--surface-1: #fcfcfb;
-	--surface-2: #f9f9f7;
-	--text-primary: #0b0b0b;
-	--text-secondary: #52514e;
-	--text-muted: #898781;
-	--gridline: #e1e0d9;
-	--border: rgba(11, 11, 11, 0.1);
-	--sequential-100: #cde2fb;
-	--sequential-400: #3987e5;
-	--sequential-500: #256abf;
-	--status-good: #0ca30c;
-	--status-warning: #fab219;
-	--status-serious: #ec835a;
-	--status-critical: #d03b3b;
-}
-
-@media (prefers-color-scheme: dark) {
-	:root:not([data-theme='light']) {
-		color-scheme: dark;
-		--surface-1: #1a1a19;
-		--surface-2: #0d0d0d;
-		--text-primary: #ffffff;
-		--text-secondary: #c3c2b7;
-		--text-muted: #898781;
-		--gridline: #2c2c2a;
-		--border: rgba(255, 255, 255, 0.1);
-		--sequential-100: #184f95;
-		--sequential-400: #3987e5;
-		--sequential-500: #5598e7;
-	}
-}
-
-:root[data-theme='dark'] {
 	color-scheme: dark;
-	--surface-1: #1a1a19;
-	--surface-2: #0d0d0d;
-	--text-primary: #ffffff;
-	--text-secondary: #c3c2b7;
-	--text-muted: #898781;
-	--gridline: #2c2c2a;
-	--border: rgba(255, 255, 255, 0.1);
-	--sequential-100: #184f95;
-	--sequential-400: #3987e5;
-	--sequential-500: #5598e7;
+	--bg: #08080f;
+	--surface: #0f0f1a;
+	--sur2: #141420;
+	--sur3: #191928;
+	--border: #1e1e30;
+	--border2: #252538;
+	--border-strong: rgba(255, 176, 32, 0.28);
+	--border-danger: rgba(255, 132, 146, 0.26);
+	--text: #e8e8f0;
+	--muted: #555570;
+	--muted-strong: #c7cae0;
+	--accent: #ffb020;
+	--accent-d: #cc8c10;
+	--accent-soft: rgba(255, 176, 32, 0.12);
+	--accent-glow: rgba(255, 176, 32, 0.08);
+	--blue: #55b5ff;
+	--success: #65db93;
+	--success-soft: rgba(101, 219, 147, 0.12);
+	--success-border: rgba(101, 219, 147, 0.25);
+	--danger: #ff6f71;
+	--danger-soft: rgba(255, 111, 113, 0.12);
+	--shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
+	--card-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+	--radius: 13px;
+	--font-display: 'Syne', system-ui, sans-serif;
+	--font-mono: 'DM Mono', ui-monospace, monospace;
 }
 
 * {
@@ -52,16 +36,180 @@
 
 body {
 	margin: 0;
-	background: var(--surface-2);
-	color: var(--text-primary);
-	font-family:
-		system-ui,
-		-apple-system,
-		'Segoe UI',
-		sans-serif;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font-mono);
+	font-size: 13px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+	font-family: var(--font-display);
+	font-weight: 700;
 }
 
 button {
 	font-family: inherit;
 	cursor: pointer;
+}
+
+code,
+pre {
+	font-family: var(--font-mono);
+}
+
+/* --- Buttons --- */
+.btn {
+	border: 1px solid var(--border);
+	background: rgba(255, 255, 255, 0.03);
+	color: var(--text);
+	border-radius: 12px;
+	padding: 11px 14px;
+	font-family: var(--font-mono);
+	font-size: 12px;
+	transition:
+		transform 0.15s ease,
+		border-color 0.15s ease,
+		background 0.15s ease;
+}
+.btn:hover:not(:disabled) {
+	border-color: var(--border2);
+	transform: translateY(-1px);
+}
+.btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+	transform: none;
+}
+.btn.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #1f1400;
+	font-weight: 700;
+}
+.btn.primary:hover:not(:disabled) {
+	background: #ffc04d;
+}
+.btn.subtle {
+	background: var(--sur2);
+	padding: 10px 12px;
+	font-size: 11px;
+	color: var(--muted);
+}
+.btn.subtle:hover:not(:disabled) {
+	color: var(--text);
+}
+.btn.danger {
+	border-color: var(--border-danger);
+	background: var(--danger-soft);
+	color: #ffd2d8;
+}
+.btn.danger:hover:not(:disabled) {
+	background: rgba(255, 111, 113, 0.2);
+	border-color: var(--danger);
+}
+
+/* --- Badge pills --- */
+.badge-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 5px 10px;
+	border-radius: 999px;
+	font-family: var(--font-mono);
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	border: 1px solid transparent;
+}
+.badge-pill.accent {
+	background: rgba(255, 176, 32, 0.08);
+	border-color: rgba(255, 176, 32, 0.2);
+	color: #ffd58a;
+}
+.badge-pill.success {
+	background: rgba(101, 219, 147, 0.15);
+	border-color: var(--success-border);
+	color: var(--success);
+}
+.badge-pill.danger {
+	background: var(--danger-soft);
+	border-color: var(--border-danger);
+	color: #ffd2d8;
+}
+.badge-pill.info {
+	background: rgba(85, 181, 255, 0.12);
+	border-color: rgba(85, 181, 255, 0.24);
+	color: var(--blue);
+}
+.badge-pill.muted {
+	background: rgba(255, 255, 255, 0.03);
+	border-color: var(--border);
+	color: var(--muted);
+}
+
+/* --- Cards --- */
+.card {
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
+		var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 22px;
+	padding: 22px;
+	box-shadow: var(--shadow);
+}
+
+/* --- Forms --- */
+input,
+select,
+textarea {
+	border: 1px solid var(--border);
+	border-radius: 14px;
+	background: var(--sur2);
+	color: var(--text);
+	font-family: var(--font-mono);
+	font-size: 13px;
+	padding: 12px 13px;
+	outline: none;
+	transition:
+		border-color 0.15s ease,
+		box-shadow 0.15s ease;
+}
+input:focus,
+select:focus,
+textarea:focus {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px rgba(255, 176, 32, 0.14);
+}
+
+/* --- Tables --- */
+table.token-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-family: var(--font-mono);
+	font-size: 12px;
+	border-radius: 12px;
+	border: 1px solid var(--border);
+	overflow: hidden;
+}
+table.token-table th {
+	text-align: left;
+	padding: 8px 14px;
+	background: rgba(255, 255, 255, 0.02);
+	border-bottom: 1px solid var(--border);
+	font-size: 10px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--muted);
+	font-weight: 500;
+}
+table.token-table td {
+	text-align: left;
+	padding: 10px 14px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+table.token-table tr:last-child td {
+	border-bottom: none;
 }

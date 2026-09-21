@@ -39,12 +39,12 @@
 <style>
 	h2 {
 		margin: 0 0 2px;
-		font-size: 20px;
+		font-size: 24px;
 	}
 	.subtitle {
 		margin: 0 0 16px;
-		color: var(--text-secondary);
-		font-size: 13px;
+		color: var(--muted);
+		font-size: 12px;
 	}
 	.tiles {
 		display: flex;

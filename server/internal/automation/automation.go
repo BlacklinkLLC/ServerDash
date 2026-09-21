@@ -6,7 +6,10 @@ package automation
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,19 +18,25 @@ import (
 	"serverdash/internal/containers"
 	"serverdash/internal/scripts"
 	"serverdash/internal/store"
+	"serverdash/internal/workflow"
 )
 
 type Runner struct {
-	store  *store.Store
-	docker *containers.Client
+	store    *store.Store
+	docker   *containers.Client
+	executor *workflow.Executor
 
 	mu         sync.Mutex
 	cron       *cron.Cron
 	unhealthyC chan struct{}
 }
 
-func NewRunner(st *store.Store, docker *containers.Client) *Runner {
-	return &Runner{store: st, docker: docker}
+func NewRunner(st *store.Store, docker *containers.Client, composeCmd []string) *Runner {
+	return &Runner{
+		store:    st,
+		docker:   docker,
+		executor: &workflow.Executor{Docker: docker, ComposeCmd: composeCmd},
+	}
 }
 
 // Start begins running the unhealthy-restart ticker and loads the cron
@@ -107,6 +116,25 @@ func (r *Runner) Reload(ctx context.Context) error {
 		}
 	}
 
+	workflows, err := r.store.ListWorkflows(ctx)
+	if err != nil {
+		return err
+	}
+	for _, wf := range workflows {
+		if !wf.Enabled {
+			continue
+		}
+		spec, err := cronSpecFor(wf)
+		if err != nil {
+			log.Printf("automation: workflow %q has an invalid trigger: %v", wf.Name, err)
+			continue
+		}
+		wf := wf
+		if _, err := newCron.AddFunc(spec, func() { r.RunWorkflow(context.Background(), wf, "schedule") }); err != nil {
+			log.Printf("automation: bad schedule %q for workflow %q: %v", spec, wf.Name, err)
+		}
+	}
+
 	r.mu.Lock()
 	old := r.cron
 	r.cron = newCron
@@ -117,6 +145,52 @@ func (r *Runner) Reload(ctx context.Context) error {
 		old.Stop()
 	}
 	return nil
+}
+
+// cronSpecFor turns a workflow's "HH:MM in this IANA timezone" trigger into
+// a robfig/cron spec. The CRON_TZ= prefix is what lets each workflow run in
+// its own timezone rather than the process's — e.g. "at midnight America/
+// Chicago" keeps firing at local midnight across a DST transition, which a
+// UTC-only cron spec computed once wouldn't.
+func cronSpecFor(wf store.Workflow) (string, error) {
+	parts := strings.SplitN(wf.TriggerTime, ":", 2)
+	if len(parts) != 2 {
+		return "", fmt.Errorf("trigger time %q must be HH:MM", wf.TriggerTime)
+	}
+	hour, err := strconv.Atoi(parts[0])
+	if err != nil || hour < 0 || hour > 23 {
+		return "", fmt.Errorf("invalid hour in %q", wf.TriggerTime)
+	}
+	minute, err := strconv.Atoi(parts[1])
+	if err != nil || minute < 0 || minute > 59 {
+		return "", fmt.Errorf("invalid minute in %q", wf.TriggerTime)
+	}
+	tz := wf.TriggerTZ
+	if tz == "" {
+		tz = "UTC"
+	}
+	return fmt.Sprintf("CRON_TZ=%s %d %d * * *", tz, minute, hour), nil
+}
+
+// RunWorkflow executes a workflow's blocks and records the result, shared
+// between the cron schedule above and the admin panel's "run now" button.
+func (r *Runner) RunWorkflow(ctx context.Context, wf store.Workflow, triggeredBy string) {
+	runID, err := r.store.StartWorkflowRun(ctx, wf.ID, triggeredBy)
+	if err != nil {
+		log.Printf("automation: record workflow run start for %q: %v", wf.Name, err)
+		return
+	}
+
+	blocks, err := workflow.ParseBlocks(wf.Blocks)
+	if err != nil {
+		_ = r.store.FinishWorkflowRun(ctx, runID, false, err.Error())
+		return
+	}
+
+	logText, ok := r.executor.Run(ctx, blocks)
+	if err := r.store.FinishWorkflowRun(ctx, runID, ok, logText); err != nil {
+		log.Printf("automation: record workflow run finish for %q: %v", wf.Name, err)
+	}
 }
 
 func (r *Runner) runUnhealthyLoop(ctx context.Context, stop chan struct{}) {

@@ -4,39 +4,19 @@
 	const statusFor = (s) => {
 		switch (s) {
 			case 'running':
-				return { color: 'var(--status-good)', label: 'Running', icon: '●' };
+				return { variant: 'success', label: 'Running' };
 			case 'paused':
-				return { color: 'var(--status-warning)', label: 'Paused', icon: '●' };
 			case 'restarting':
-				return { color: 'var(--status-warning)', label: 'Restarting', icon: '●' };
+				return { variant: 'accent', label: s === 'paused' ? 'Paused' : 'Restarting' };
 			case 'exited':
 			case 'dead':
-				return { color: 'var(--status-critical)', label: 'Stopped', icon: '●' };
+				return { variant: 'danger', label: 'Stopped' };
 			default:
-				return { color: 'var(--text-muted)', label: s ?? 'Unknown', icon: '●' };
+				return { variant: 'muted', label: s ?? 'Unknown' };
 		}
 	};
 
 	let status = $derived(statusFor(state));
 </script>
 
-<span class="badge" style="color: {status.color}">
-	<span class="dot" style="background: {status.color}"></span>
-	{status.label}
-</span>
-
-<style>
-	.badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 13px;
-		font-weight: 600;
-	}
-	.dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		flex-shrink: 0;
-	}
-</style>
+<span class="badge-pill {status.variant}">{status.label}</span>
