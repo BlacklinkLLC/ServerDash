@@ -976,7 +976,6 @@ cmd_status() {
 	panel "ServerDash" \
 		"$(kv "Status" "$state")" \
 		"$(kv "Local URL" "http://$(host_ip):${port:-9900}")" \
-		"$(kv "Public URL" "https://${host:-unset}")" \
 		"$(kv "Directory" "$SERVERDASH_DIR")" \
 		"$(kv "Runtime" "$COMPOSE_CMD")" \
 		"$(kv "Version" "$version")"
@@ -1290,7 +1289,6 @@ summary() {
 	if [ "$START_SERVICE" -eq 1 ]; then
 		panel "$title" \
 			"$(kv "Open" "${AMBER}http://$ip:$PORT${RST}")" \
-			"$(kv "Public URL" "https://$PUBLIC_HOST" "(via reverse proxy)")" \
 			"$(kv "Directory" "$INSTALL_DIR")" \
 			"$(kv "Runtime" "$COMPOSE_CMD")" \
 			"$(kv "Manage" "${AMBER}serverdash config${RST}" "(port, host, …)")" \
