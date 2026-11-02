@@ -1,389 +1,262 @@
 # ServerDash
 
-A self-hosted dashboard for monitoring servers and controlling their Docker/Podman
-containers and Kubernetes pods. Deployed as a single container, served at
-**nova.blacklink.net**. Visual design matches Blacklink's NOVA design system
-(dark, amber accent, Syne/DM Mono type) — see `web/src/app.css`. App name, logo,
-accent color, and which dashboard sections show are all runtime-configurable from
-Admin → Appearance, for white-labeling and per-deployment customization.
+A self-hosted dashboard for monitoring your servers and managing the Docker, Podman, and Kubernetes workloads running on them. It ships as a single container, and Blacklink runs it at **nova.blacklink.net**.
 
-## Architecture
+- **Monitor** CPU, memory, load, and disk usage in real time.
+- **Control** containers and pods: start, stop, restart, stream logs, or open a shell.
+- **Automate** with scheduled tasks, shell scripts, and block-based deployment workflows.
+- **Make it yours**: name, logo, accent color, and visible sections are all configurable at runtime.
 
-- **`server/`** — Go backend.
-  - Host metrics (CPU, memory, load, disk) via gopsutil.
-  - Docker/Podman container control over the Docker Engine API (Podman's socket is
-    API-compatible, so the same client works for either), plus an interactive
-    web terminal (`docker exec`-equivalent) over WebSocket.
-  - Kubernetes pod listing/restart/logs by shelling out to `kubectl` — reuses
-    whatever kubeconfig/contexts/auth plugins are already set up rather than
-    reimplementing cluster auth.
-  - Auth (session cookies, bcrypt), users/roles, nicknames, automation rules,
-    scripts, workflows, and settings/branding, all persisted in an embedded
-    SQLite database (`internal/store`) — see [Data persistence](#data-persistence)
-    for what has to be true for this to survive an update.
-  - Built-in automation + user script + workflow scheduling via a cron runner
-    (`internal/automation`), including per-workflow timezones.
-  - `internal/workflow`: the block-based deployment automation language — see
-    [Workflows](#workflows-block-based-deployment-automation) below.
-  - `internal/selfupdate`: checks ServerDash's own git checkout for upstream
-    changes and can pull + rebuild + restart itself — see
-    [Self-update](#self-update) below.
-  - Exposes all of it through an authenticated HTTP + WebSocket API.
-- **`web/`** — Svelte + Vite dashboard, served by a small Express server that also
-  proxies `/api` (including WebSocket log/terminal streams) through to the Go
-  backend, so the browser only ever talks to one origin.
-- Both processes run in one container, managed by `supervisord` (see `Dockerfile`,
-  `docker/supervisord.conf`).
-- **`install.sh`** — installs Docker or Podman if missing, fetches ServerDash, and
-  runs it as a systemd-managed service. See [Installing on a server](#installing-on-a-server).
+The UI follows Blacklink's NOVA design system (dark, amber accent). The styles live in `web/src/app.css`.
 
-## First run
+## Contents
 
-The first time ServerDash starts (empty database), every page redirects to a setup
-screen that **requires creating an administrator account** before anything else —
-the dashboard, containers, Kubernetes view, and every API route (other than health,
-setup, and login) are unreachable until that account exists. From then on, sign-in
-is required for everyone; `admin` users manage other accounts, roles, automation,
-and scripts from the Admin panel, `operator` can act on containers/pods but not
-touch admin settings, and `viewer` is read-only.
+- [Quick start](#quick-start)
+- [Installing on a server](#installing-on-a-server)
+- [Features](#features)
+- [Roles and first run](#roles-and-first-run)
+- [Configuration notes](#configuration-notes)
+- [Data persistence](#data-persistence)
+- [Workflows](#workflows)
+- [Self-update](#self-update)
+- [Web terminal](#web-terminal)
+- [Architecture](#architecture)
+- [Local development](#local-development)
+- [Roadmap](#roadmap)
 
-## Data persistence
-
-Users, sessions, nicknames, settings/branding, scripts, and workflows all live in
-one SQLite file at `SERVERDASH_DB_PATH` (default `/data/serverdash.db` in the
-container); an uploaded logo lives alongside it under `SERVERDASH_DATA_DIR`
-(defaults to that same `/data`). `docker-compose.yml` keeps `/data` in a named
-volume (`serverdash-data`), which — like any Docker volume — survives
-`docker compose up -d --build`, `docker compose down` (without `-v`), and image
-rebuilds; it's only lost if you explicitly remove that volume or run ServerDash
-some other way (e.g. plain `docker run`) without mounting a persistent path there.
-On startup, ServerDash logs exactly where it's storing data, including a loud
-warning if it's about to use the non-persistent default path — check `docker logs`
-if something seems to have reset.
-
-## Running it
+## Quick start
 
 ```sh
-cp .env.example .env   # adjust SERVERDASH_PUBLIC_HOST, port, etc.
+cp .env.example .env   # set SERVERDASH_PUBLIC_HOST, SERVERDASH_PORT, etc.
 docker compose up -d --build
 ```
 
-This builds the image and starts ServerDash on `http://localhost:9900` (or
-`SERVERDASH_PORT` from `.env`); reverse-proxy it at **nova.blacklink.net** for the
-real deployment. Open it and create the admin account to finish setup.
-
-`docker-compose.yml`:
-- Mounts the Docker socket (swap for Podman's socket + `SERVERDASH_DOCKER_HOST` to
-  manage Podman instead — also works unmodified via `podman-compose` and Podman's
-  rootless socket).
-- Bind-mounts the host's `/proc`, `/sys`, and root filesystem (read-only) so host
-  metrics reflect the real machine rather than the container's own view —
-  `pid: host` and the `/rootfs` bind mount are both load-bearing, not incidental;
-  see the comments in the file for why.
-- Keeps users/sessions/nicknames/scripts in a named volume (`serverdash-data`), so
-  they survive `docker compose down` / image rebuilds.
-- Has a commented-out kubeconfig mount for Kubernetes support — uncomment it and
-  set `SERVERDASH_KUBECONFIG=/kubeconfig` in `.env` to enable the Kubernetes tab.
-  **On SELinux-enforcing hosts (Fedora/RHEL/CentOS)**, add `:Z` to that mount or
-  the container won't be able to read the file even as root. Pointing it at a
-  local minikube/kind cluster additionally needs `network_mode: host`, since their
-  kubeconfigs reference the host's loopback address — a real remote cluster's
-  kubeconfig (embedded certs, a real endpoint) doesn't have this problem.
-- Has a commented-out mount + `security_opt` for the workflow feature's
-  `git_pull`/`compose_up` blocks — see
-  [Workflows](#workflows-block-based-deployment-automation).
-
-### Local development
-
-```sh
-# terminal 1 — Go API on :8080
-cd server && go run ./cmd/serverdash
-
-# terminal 2 — Svelte dev server on :5173, proxying /api to :8080
-cd web && npm install && npm run dev
-```
+ServerDash will be available at `http://localhost:9900` (or whatever `SERVERDASH_PORT` is set to). Open it and create your administrator account to finish setup. For a real deployment, put it behind a reverse proxy (Blacklink uses **nova.blacklink.net**).
 
 ## Installing on a server
+
+On a bare server, one command does everything:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/BlacklinkLLC/ServerDash/main/install.sh | sudo bash
 ```
 
-Installs Docker (or Podman with `--runtime podman`), clones ServerDash to
-`/opt/serverdash`, builds the image, and runs it as a systemd service (`systemctl
-status serverdash`). Safe to re-run to upgrade — see `install.sh --help` for
-options (`--dir`, `--public-host`, `--port`, `--branch`, `--no-start`).
+The script installs Docker if it's missing (or Podman, with `--runtime podman`), clones ServerDash to `/opt/serverdash`, builds the image, and runs it as a systemd service. Check on it with `systemctl status serverdash`.
 
-## Workflows: block-based deployment automation
+It's safe to re-run, which also upgrades an existing install. Run `install.sh --help` for the full list of options: `--dir`, `--public-host`, `--port`, `--branch`, and `--no-start`.
 
-Admin → Workflows builds scheduled automations out of a small set of fixed,
-typed blocks — not a general scripting language, so there's nothing to sandbox
-beyond what each block already does. A trigger ("at 00:00 America/Chicago")
-plus an ordered list of blocks, e.g. the canonical case — nightly redeploy of a
-git-based service:
+## Features
 
-1. **Git Pull** — `dir: /opt/myapp`
-2. **Rebuild & Run (docker compose up)** — `dir: /opt/myapp`, `build: true`
+**Monitoring**
+- Server overview: hostname, platform, uptime, and load average
+- CPU, memory, and per-disk usage with usage bars
 
-Blocks run top to bottom and stop at the first failure; every run (scheduled or
-"Run now") is logged block-by-block in the workflow's history. Available blocks:
-Git Pull, Rebuild & Run (`docker compose up -d [--build]`), Restart Container,
-Run Command (arbitrary shell, optional working directory), Wait.
+**Containers and pods**
+- Docker and Podman: list containers, start/stop/restart, live log streaming, and an admin-only [web terminal](#web-terminal)
+- Kubernetes: list pods across contexts and namespaces, restart them (the pod is deleted and its controller recreates it), and stream logs
+- Nicknames: give any container or pod a friendlier display name
 
-**This needs real filesystem access that the default `docker-compose.yml`
-doesn't grant**, because ServerDash itself runs containerized: a workflow's
-`dir` has to exist inside *ServerDash's own container*, at the same path it
-has on the host, for `git`/`docker compose` (both shelled out to, bundled in
-the image) to find it. Uncomment the commented-out mount in
-`docker-compose.yml` and point it at whatever parent directory holds your
-deployed projects (e.g. `/opt:/opt`) — never `/tmp`, which under a
-systemd-managed Docker daemon with `PrivateTmp` resolves to dockerd's own
-private empty tmpfs, not the host `/tmp` your shell sees, so a mount from
-there silently binds the wrong directory.
+**Automation**
+- Built-in rules: auto-restart unhealthy containers, scheduled prune, and scheduled tar+gzip backups with retention
+- Scripts: admin-written shell scripts that run on demand or on a cron schedule, with run history and captured output
+- [Workflows](#workflows): scheduled, block-based deployment automation (git pull, compose up, restart, run a command, wait)
 
-Two more things that come up specifically on SELinux-enforcing hosts
-(Fedora/RHEL/CentOS — not an issue elsewhere):
-- Bind-mounted directories need `:Z` to be readable at all (same as the
-  kubeconfig mount above).
-- `:Z` alone isn't enough for these two block types specifically: SELinux's
-  container policy separately blocks a container's own nested `docker`/`git`
-  CLI calls against the mounted socket, even though the dashboard's normal
-  container controls (start/stop/restart, which go straight to the Engine
-  API, not through the CLI) are unaffected. If you want `git_pull`/
-  `compose_up`, uncomment `security_opt: label=disable` in
-  `docker-compose.yml` — it runs ServerDash unconfined, which is a real
-  reduction in isolation, so only do it if you're using those two blocks.
-  (`git`'s separate "dubious ownership" check, since the container runs as
-  root over a host-user-owned directory, is handled for you — no
-  `safe.directory` config needed.)
+**Administration**
+- Session-cookie login, forced first-run admin setup, and admin/operator/viewer roles
+- Appearance: rename the app, upload your own logo, pick an accent color, and choose which dashboard sections appear, all under Admin → Appearance and applied everywhere, including the sign-in screen
+- [Self-update](#self-update): check for upstream changes and redeploy from the Admin panel
+
+## Roles and first run
+
+On first start, with an empty database, every page redirects to a setup screen that requires you to create an administrator account. Until that account exists, nothing else works: the dashboard, the container and Kubernetes views, and every API route except health, setup, and login are blocked. After setup, everyone must sign in.
+
+| Role | Can do |
+| --- | --- |
+| `admin` | Everything, including managing users, roles, automation, scripts, workflows, and settings |
+| `operator` | Act on containers and pods, but not change admin settings |
+| `viewer` | Read-only access |
+
+## Configuration notes
+
+`docker-compose.yml` is set up for the common case. Here is what it does and what you may need to change.
+
+**Container runtime.** It mounts the Docker socket. To manage Podman instead, swap in Podman's socket and set `SERVERDASH_DOCKER_HOST`. It also works unmodified with `podman-compose` and Podman's rootless socket.
+
+**Host metrics.** The host's `/proc`, `/sys`, and root filesystem are bind-mounted read-only so the numbers reflect the real machine, not the container's own view. `pid: host` and the `/rootfs` mount are both required. The comments in the file explain why.
+
+**Kubernetes.** The kubeconfig mount is commented out. To enable the Kubernetes tab, uncomment it and set `SERVERDASH_KUBECONFIG=/kubeconfig` in `.env`.
+- On SELinux-enforcing hosts (Fedora, RHEL, CentOS), add `:Z` to the mount, or the container can't read the file even as root.
+- For a local minikube or kind cluster, also set `network_mode: host`, because their kubeconfigs point at the host's loopback address. A remote cluster with embedded certs and a real endpoint doesn't need this.
+
+**Workflows and self-update.** These need extra filesystem access, covered in [Workflows](#workflows) and [Self-update](#self-update).
+
+## Data persistence
+
+Everything ServerDash stores (users, sessions, nicknames, settings and branding, scripts, and workflows) lives in one SQLite file at `SERVERDASH_DB_PATH`, which defaults to `/data/serverdash.db` inside the container. An uploaded logo is stored next to it under `SERVERDASH_DATA_DIR`, which defaults to the same `/data`.
+
+`docker-compose.yml` keeps `/data` in a named volume, `serverdash-data`. Like any Docker volume, it survives `docker compose up -d --build`, image rebuilds, and `docker compose down` (without `-v`). Your data is lost only if you delete the volume or run ServerDash another way, such as plain `docker run`, without mounting a persistent path at `/data`.
+
+At startup, ServerDash logs exactly where it is storing data, with a loud warning if it is about to use the non-persistent default. If something seems to have reset, check `docker logs`.
+
+## Workflows
+
+Under Admin → Workflows you can build scheduled automations from a small set of fixed, typed blocks. This is deliberately not a general scripting language, so there is nothing to sandbox beyond what each block already does.
+
+A workflow is a trigger (for example, "at 00:00 America/Chicago") plus an ordered list of blocks. The classic example is a nightly redeploy of a git-based service:
+
+1. **Git Pull**: `dir: /opt/myapp`
+2. **Rebuild & Run**: `dir: /opt/myapp`, `build: true` (runs `docker compose up -d --build`)
+
+Blocks run top to bottom and stop at the first failure. Every run, scheduled or started with "Run now", is logged block by block in the workflow's history.
+
+**Available blocks:** Git Pull, Rebuild & Run (`docker compose up -d [--build]`), Restart Container, Run Command (arbitrary shell, with an optional working directory), and Wait.
+
+### Filesystem access
+
+Because ServerDash itself runs in a container, the default `docker-compose.yml` can't reach your projects. A workflow's `dir` must exist inside ServerDash's container at the same path as on the host, so that the bundled `git` and `docker compose` can find it.
+
+Uncomment the mount in `docker-compose.yml` and point it at the parent directory that holds your deployed projects (for example, `/opt:/opt`). Don't use `/tmp`. Under a systemd-managed Docker daemon with `PrivateTmp`, `/tmp` resolves to dockerd's own empty tmpfs rather than the host's, so the mount would silently bind the wrong directory.
+
+### SELinux hosts
+
+On SELinux-enforcing hosts (Fedora, RHEL, CentOS), two extra steps apply:
+
+- Bind-mounted directories need `:Z` to be readable, the same as the kubeconfig mount.
+- `:Z` is not enough for the `git_pull` and `compose_up` blocks. SELinux's container policy separately blocks a container's own nested `docker` and `git` CLI calls against the mounted socket. The dashboard's normal container controls (start, stop, restart) are unaffected because they call the Engine API directly instead of going through the CLI.
+
+To use those two blocks, uncomment `security_opt: label=disable` in `docker-compose.yml`. This runs ServerDash unconfined, which is a real reduction in isolation, so only do it if you need them.
+
+Git's "dubious ownership" check, which would otherwise trigger because the container runs as root over a host-user-owned directory, is handled for you. No `safe.directory` setup is needed.
 
 ## Self-update
 
-Admin → Updates checks ServerDash's own git checkout against its remote (`git
-fetch` + compare `HEAD` to `origin/<branch>`) and, if there's something new, pulls
-and redeploys with one click. Needs `SERVERDASH_INSTALL_DIR` set to that
-checkout's path on the host, mounted into the container at the same path — same
-requirement as a workflow's `git_pull`/`compose_up` blocks, and the same `:Z` note
-applies on SELinux-enforcing hosts. Unlike those workflow blocks, self-update
-*doesn't* need `security_opt: label=disable` on ServerDash's own container: since
-ServerDash is rebuilding and restarting itself, the actual `docker compose up -d
---build` runs in a separate, short-lived helper container (launched with `docker
-run -d`, from the same image ServerDash itself is running, so nothing extra needs
-pulling) that's unconfined on its own and exits once the rebuild's handed off —
-the `git pull` itself, which doesn't need that, still runs directly in ServerDash's
-own container. Your data isn't affected either way — see
-[Data persistence](#data-persistence).
+Admin → Updates compares ServerDash's own git checkout against its remote (`git fetch`, then `HEAD` against `origin/<branch>`). If something new is available, one click pulls and redeploys it.
+
+**Requirements:** set `SERVERDASH_INSTALL_DIR` to the checkout's path on the host, and mount it into the container at the same path. This is the same requirement as the workflow git blocks, and the same `:Z` note applies on SELinux hosts.
+
+Unlike those workflow blocks, self-update does not need `security_opt: label=disable`. The `git pull` runs directly in ServerDash's container, but the `docker compose up -d --build` runs in a separate, short-lived helper container. That helper is started with `docker run -d` from the image ServerDash is already running, so nothing extra needs pulling. It is unconfined on its own and exits once the rebuild has been handed off.
+
+Your data is unaffected either way. See [Data persistence](#data-persistence).
 
 ## Web terminal
 
-Admin-only "Terminal" button on any running container (Services list) opens an
-interactive shell — `docker exec`-equivalent, xterm.js in the browser talking to
-the Engine API's exec/attach endpoints over WebSocket, full PTY resize support.
-Tries `bash`, falls back to `sh` for minimal images. Works against Podman
-containers unmodified, same as every other container control — it's the same
-Engine API client throughout.
+Admins see a **Terminal** button on every running container in the Services list. It opens an interactive shell in the browser: xterm.js talking to the Engine API's exec/attach endpoints over WebSocket, with full PTY resize support. It tries `bash` first and falls back to `sh` for minimal images. It works with Podman containers unmodified, because it uses the same Engine API client as every other container control.
 
-## Implemented so far
+## Architecture
 
-- Server overview: hostname, platform, uptime, load average
-- CPU, memory, and per-disk usage (with usage bars)
-- Docker/Podman: container list, start/stop/restart, live log streaming, an
-  interactive web terminal (admin-only) — see above
-- Kubernetes: pod list (across contexts/namespaces), restart (delete → controller
-  recreates), live log streaming
-- Nicknames: rename any container or pod to a friendlier display name
-- Auth: session-cookie login, forced first-run admin setup, admin/operator/viewer
-  roles, user management
-- Automation: auto-restart unhealthy containers, scheduled prune, scheduled
-  tar+gzip backups with retention
-- Scripts: admin-authored shell scripts, run on-demand or on a cron schedule, with
-  run history and captured output
-- Workflows: block-based scheduled deployment automation (git pull, rebuild/run
-  via compose, restart a container, run a command, wait) — see above
-- Appearance: rename the app, swap in your own logo, pick an accent color, and
-  choose which dashboard sections show, all from Admin → Appearance, shown
-  everywhere including the sign-in screen
-- Self-update: check ServerDash's own git checkout for updates and redeploy from
-  the Admin panel — see above
-- `install.sh` for a one-line install on a bare server
+| Component | Stack | Role |
+| --- | --- | --- |
+| `server/` | Go | Backend and API |
+| `web/` | Svelte + Vite, served by Express | Dashboard UI; proxies `/api` (including WebSocket log and terminal streams) to the backend, so the browser talks to a single origin |
+| `install.sh` | Shell | Installs the runtime if needed, fetches ServerDash, and runs it as a systemd service |
 
-Everything below is the product roadmap — features to build toward, not yet
-implemented.
+Both processes run in one container under `supervisord` (see `Dockerfile` and `docker/supervisord.conf`).
+
+**What the backend does:**
+- **Host metrics** (CPU, memory, load, disk) via gopsutil.
+- **Container control** through the Docker Engine API. Podman's socket is API-compatible, so the same client handles both. This also powers the web terminal.
+- **Kubernetes** pod listing, restart, and logs by shelling out to `kubectl`. This reuses whatever kubeconfig, contexts, and auth plugins you already have instead of reimplementing cluster auth.
+- **Storage** of auth (session cookies, bcrypt), users and roles, nicknames, automation rules, scripts, workflows, and settings in an embedded SQLite database (`internal/store`).
+- **Scheduling** of automation rules, scripts, and workflows through a cron runner (`internal/automation`), including per-workflow time zones.
+- **Workflows** via `internal/workflow`, the block-based deployment language described [above](#workflows).
+- **Self-update** via `internal/selfupdate`, described [above](#self-update).
+- An authenticated HTTP and WebSocket API that exposes all of it.
+
+## Local development
+
+```sh
+# Terminal 1: Go API on :8080
+cd server && go run ./cmd/serverdash
+
+# Terminal 2: Svelte dev server on :5173, proxying /api to :8080
+cd web && npm install && npm run dev
+```
 
 ## Roadmap
 
-Core dashboard
+Everything above is implemented. What follows is planned and **not built yet**.
 
-* Server overview
-* CPU, RAM, disk, and network usage
-* Server uptime
-* Load average
-* Temperature monitoring where available
-* Storage health
-* Online/offline server status
-* Last heartbeat
-* Quick health indicator for every server
-* Server groups/tags
-* Multi-server overview
+### Core dashboard
+- Network usage, temperature monitoring (where available), and storage health
+- Online/offline status, last heartbeat, and a quick health indicator for every server
+- Server groups and tags, and a multi-server overview
 
-Service management
+### Service management
+- Container resource usage, uptime, exposed ports, mounted volumes, and image/version
+- Environment variables with secrets hidden
+- Pull/update images, recreate containers, and toggle automatic restart
+- Service dependencies and health checks
 
-* View all running services
-* Start/stop/restart services
-* Restart individual containers
-* View container status
-* View container resource usage
-* Container uptime
-* View exposed ports
-* View environment variables with secrets hidden
-* View mounted volumes
-* View container image/version
-* Pull/update images
-* Recreate
-* Enable/disable automatic restart
-* Service dependencies
-* Service health checks
+### Logs
+- Search, plus filtering by severity and time
+- Download, clear, and rotate logs
+- Automatic detection of common errors
 
-Logs
+### Deployments
+- Deploy new services and update existing ones, from git or from images
+- Deployment history, status, and logs, plus scheduled deployments
+- Health verification after each deploy, with automatic rollback on failure, and manual rollback
 
-* Live container logs
-* Search logs
-* Filter by severity
-* Filter by time
-* Download logs
-* Clear/rotate logs
-* Automatically detect common errors
-* Log streaming through WebSockets
+### Server administration
+- SSH terminal, file browser, and file upload/download
+- Service configuration editor and environment variable management
+- systemd service management, firewall status, network interfaces, and DNS configuration
+- Reboot/shutdown controls and package update status
 
-Deployments
+### Networking
+- Port and service map, open ports, listening processes, and internal service addresses
+- Reverse proxy, Cloudflare Tunnel, and DNS status
+- Network traffic graphs and connection monitoring
 
-* Deploy a new service
-* Update an existing service
-* Roll back an update
-* Deployment history
-* Deployment status
-* Git-based deployments
-* Image-based deployments
-* Deployment logs
-* Scheduled deployments
-* Automatic health verification after deployment
-* Automatic rollback if a deployment fails
+### Storage and backups
+- Volume management, storage cleanup, large-file detection, disk health, and snapshot status
+- Create, restore, and verify backups, with history and retention policies
+- Remote backup destinations and backup encryption
 
-Server administration
+### Security
+- Blacklink Auth integration and 2FA
+- An admin/developer/operator role model
+- API keys, session management, automatic session expiration, and login history
+- Audit logs, IP allow/deny lists, and secrets management
+- Confirmation prompts for destructive actions
 
-* SSH terminal through the dashboard
-* File browser
-* File upload/download
-* Service configuration editor
-* Environment variable management
-* Systemd service management
-* Firewall status
-* Network interfaces
-* DNS configuration
-* Reboot/shutdown controls
-* Package/update status
+### Monitoring and alerts
+- Alerts for CPU, memory, disk space, service down, container crashes, high temperature, SSL certificate expiry, and failed deployments
+- Custom alerts, email and webhook notifications, and alert history
+- Maintenance mode
 
-Networking
+### Blacklink-specific
+- A Blacklink service registry with product logos and service ownership
+- Production, staging, and development environments, with version tracking and deployment channels
+- Internal domains
+- Status for Blacklink Auth, Cloudflare, R2, and databases, plus API health checks
+- Dependency visualization
 
-* Port/service map
-* Open ports
-* Listening processes
-* Internal service addresses
-* Reverse proxy status
-* Cloudflare Tunnel status
-* DNS status
-* Network traffic graphs
-* Connection monitoring
+### Planned: Service Details page
 
-Storage
+A single page per service that pulls it all together. A rough sketch:
 
-* Disk usage
-* Volume management
-* Container volumes
-* Backup volumes
-* Storage cleanup
-* Large-file detection
-* Disk health
-* Snapshot/backup status
-
-Backups
-
-* Create backup
-* Restore backup
-* Scheduled backups
-* Backup history
-* Backup verification
-* Remote backup destinations
-* Backup encryption
-* Retention policies
-
-Security
-
-* Blacklink Auth integration
-* Role-based access control
-* Admin/developer/operator roles
-* 2FA
-* API keys
-* Session management
-* Audit logs
-* Login history
-* IP allow/deny lists
-* Secrets management
-* Automatic session expiration
-* Destructive-action confirmation
-
-Monitoring & alerts
-
-* CPU alerts
-* Memory alerts
-* Disk-space alerts
-* Service-down alerts
-* Container crash alerts
-* High-temperature alerts
-* SSL certificate expiration alerts
-* Failed deployment alerts
-* Custom alerts
-* Email/webhook notifications
-* Alert history
-* Maintenance mode
-
-Blacklink-specific stuff
-
-* Blacklink service registry
-* Blacklink product/service logos
-* Service ownership
-* Production/staging/development environments
-* Service version tracking
-* Internal domains
-* Deployment channels
-* Blacklink Auth status
-* Cloudflare status
-* R2 status
-* Database status
-* API health checks
-* Dependency visualization
-
-A really nice feature would be a “Service Details” page. For example:
-
+```
 BellRinger
 Production • Online
 
-Version: 2.4.1
-Server: BL-SRV-01
-Container: blacklink-bellringer
-Uptime: 14d 6h
-CPU: 4.2%
-Memory: 312 MB
+Version:    2.4.1
+Server:     BL-SRV-01
+Container:  blacklink-bellringer
+Uptime:     14d 6h
+CPU:        4.2%
+Memory:     312 MB
 
-[Restart] [Update] [Terminal] [Logs]
+[Restart]  [Update]  [Terminal]  [Logs]
 
 Health
-✓ Application
-✓ Database
-✓ API
-✓ Cloudflare Tunnel
+  ✓ Application
+  ✓ Database
+  ✓ API
+  ✓ Cloudflare Tunnel
 
 Recent deployments
-2.4.1 — Aug 26 — Successful
-2.4.0 — Aug 20 — Successful
-2.3.9 — Aug 12 — Successful
+  2.4.1 — Aug 26 — Successful
+  2.4.0 — Aug 20 — Successful
+  2.3.9 — Aug 12 — Successful
+```
