@@ -862,7 +862,8 @@ port_in_use() {
 
 host_ip() {
 	local ip
-	ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+	ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+	if [ -z "$ip" ]; then ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"; fi
 	printf '%s' "${ip:-<this-host>}"
 }
 
@@ -1427,7 +1428,8 @@ install_all() {
 
 summary() {
 	local ip title took
-	ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+	ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+	if [ -z "$ip" ]; then ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"; fi
 	if [ -z "$ip" ]; then ip="<this-host>"; fi
 	took="$(fmt_time $((SECONDS - T0)))"
 
