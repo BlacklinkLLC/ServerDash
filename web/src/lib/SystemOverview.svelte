@@ -1,5 +1,6 @@
 <script>
 	import Gauge from './charts/Gauge.svelte';
+	import Icon from './Icon.svelte';
 	import AreaChart from './charts/AreaChart.svelte';
 	import { formatBytes, formatUptime, formatPercent, formatRate, statusFor, statusLabel } from './format.js';
 
@@ -70,15 +71,15 @@
 			</div>
 		</div>
 		<div class="hero-stats">
-			<div><span class="k">Uptime</span><span class="v">{formatUptime(snapshot?.uptimeSeconds)}</span></div>
+			<div><span class="k"><Icon name="Clock" size={12} /> Uptime</span><span class="v">{formatUptime(snapshot?.uptimeSeconds)}</span></div>
 			<div>
-				<span class="k">Load</span>
+				<span class="k"><Icon name="Speedometer" size={12} /> Load</span>
 				<span class="v">{snapshot ? snapshot.loadAvg1.toFixed(2) : '—'}</span>
 				<span class="sub">{snapshot ? `${snapshot.loadAvg5.toFixed(2)} · ${snapshot.loadAvg15.toFixed(2)}` : ''}</span>
 			</div>
-			<div><span class="k">Processes</span><span class="v">{snapshot?.processCount ?? '—'}</span></div>
+			<div><span class="k"><Icon name="Script" size={12} /> Processes</span><span class="v">{snapshot?.processCount ?? '—'}</span></div>
 			<div>
-				<span class="k">Network</span>
+				<span class="k"><Icon name="Globe" size={12} /> Network</span>
 				<span class="v small">↓ {formatRate(latest?.rx ?? 0)}</span>
 				<span class="sub">↑ {formatRate(latest?.tx ?? 0)}</span>
 			</div>
@@ -117,18 +118,18 @@
 				</div>
 			{:else if w === 'cpuChart'}
 				<div class="panel span-half">
-					<div class="panel-title">CPU usage <span>{formatPercent(snapshot?.cpuPercent)}</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="Speedometer" size={14} /> CPU usage</span> <span>{formatPercent(snapshot?.cpuPercent)}</span></div>
 					<AreaChart points={history} series={[{ key: 'cpu', label: 'CPU', color: 'var(--accent)' }]} max={100} format={pctFmt} />
 				</div>
 			{:else if w === 'memChart'}
 				<div class="panel span-half">
-					<div class="panel-title">Memory usage <span>{formatPercent(snapshot?.memUsedPercent)}</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="Stack" size={14} /> Memory usage</span> <span>{formatPercent(snapshot?.memUsedPercent)}</span></div>
 					<AreaChart points={history} series={[{ key: 'mem', label: 'Memory', color: 'var(--accent)' }]} max={100} format={pctFmt} />
 				</div>
 			{:else if w === 'netChart'}
 				<div class="panel span-full">
 					<div class="panel-title">
-						Network throughput
+						<span class="pt"><Icon name="Ethernet" size={14} /> Network throughput</span>
 						<span class="legend">
 							<span><i style="background: var(--accent)"></i>Download {formatRate(latest?.rx ?? 0)}</span>
 							<span><i style="background: var(--blue)"></i>Upload {formatRate(latest?.tx ?? 0)}</span>
@@ -146,7 +147,7 @@
 				</div>
 			{:else if w === 'cores' && snapshot?.perCoreCpu?.length}
 				<div class="panel span-half">
-					<div class="panel-title">Per-core load <span>{snapshot.cpuModel ?? ''}</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="Bolt" size={14} /> Per-core load</span> <span>{snapshot.cpuModel ?? ''}</span></div>
 					<div class="cores">
 						{#each snapshot.perCoreCpu as c, i}
 							<div class="core" title="Core {i}: {c.toFixed(1)}%">
@@ -157,7 +158,7 @@
 				</div>
 			{:else if w === 'disks' && snapshot?.disks?.length}
 				<div class="panel span-half">
-					<div class="panel-title">Storage <span>{snapshot.disks.length} volume{snapshot.disks.length > 1 ? 's' : ''}</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="Folder" size={14} /> Storage</span> <span>{snapshot.disks.length} volume{snapshot.disks.length > 1 ? 's' : ''}</span></div>
 					<div class="disks">
 						{#each snapshot.disks as d (d.path)}
 							{@const s = statusFor(d.usedPercent, warn, crit)}
@@ -173,7 +174,7 @@
 				</div>
 			{:else if w === 'containers'}
 				<div class="panel span-half">
-					<div class="panel-title">Containers <span>{containers.length} total</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="Blocks" size={14} /> Containers</span> <span>{containers.length} total</span></div>
 					<div class="counts">
 						<div><span class="status-dot good"></span><b>{containerCounts.running}</b> running</div>
 						<div><span class="status-dot"></span><b>{containerCounts.stopped}</b> stopped</div>
@@ -189,7 +190,7 @@
 			{:else if w === 'processes' && processes}
 				<div class="panel span-half">
 					<div class="panel-title">
-						Top processes
+						<span class="pt"><Icon name="Terminal" size={14} /> Top processes</span>
 						<button class="link" onclick={() => onnavigate?.('tools')}>Open process manager →</button>
 					</div>
 					<table class="procs">
@@ -272,6 +273,9 @@
 		gap: 2px;
 	}
 	.k {
+		display: flex;
+		align-items: center;
+		gap: 5px;
 		font-size: 10px;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
@@ -309,6 +313,12 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 		gap: 16px;
+	}
+	.pt {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		color: var(--muted-strong);
 	}
 	.legend {
 		display: flex;

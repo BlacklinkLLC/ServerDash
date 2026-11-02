@@ -2,6 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { api } from './api.js';
 	import { formatBytes } from './format.js';
+	import Icon from './Icon.svelte';
 
 	let { isAdmin, refreshSeconds = 5 } = $props();
 
@@ -80,11 +81,11 @@
 </script>
 
 <section>
-	<h2>Server tools</h2>
+	<h2><Icon name="Settings" size={20} /> Server tools</h2>
 	<nav class="tabs">
-		<button class:active={tab === 'processes'} onclick={() => (tab = 'processes')}>Processes</button>
-		<button class:active={tab === 'ports'} onclick={() => (tab = 'ports')}>Listening ports</button>
-		<button class:active={tab === 'network'} onclick={() => (tab = 'network')}>Network interfaces</button>
+		<button class:active={tab === 'processes'} onclick={() => (tab = 'processes')}><Icon name="Script" size={14} /> Processes</button>
+		<button class:active={tab === 'ports'} onclick={() => (tab = 'ports')}><Icon name="Connect" size={14} /> Listening ports</button>
+		<button class:active={tab === 'network'} onclick={() => (tab = 'network')}><Icon name="Ethernet" size={14} /> Network interfaces</button>
 	</nav>
 
 	{#if error}<p class="error">{error}</p>{/if}
@@ -199,6 +200,9 @@
 
 <style>
 	h2 {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 		margin: 0 0 14px;
 		font-size: 22px;
 	}
@@ -209,6 +213,9 @@
 		border-bottom: 1px solid var(--border);
 	}
 	.tabs button {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 		background: none;
 		border: none;
 		border-bottom: 2px solid transparent;

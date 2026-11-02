@@ -10,6 +10,8 @@
 	import SetupPage from './lib/SetupPage.svelte';
 	import LoginPage from './lib/LoginPage.svelte';
 	import BrandLogo from './lib/BrandLogo.svelte';
+	import Icon from './lib/Icon.svelte';
+	import Footer from './lib/Footer.svelte';
 
 	// 'loading' | 'setup' | 'login' | 'ready'
 	let authState = $state('loading');
@@ -141,16 +143,16 @@
 			<h1>{branding.appName}</h1>
 		</div>
 		<nav>
-			<button class:active={page === 'dashboard'} onclick={() => (page = 'dashboard')}>Dashboard</button>
-			<button class:active={page === 'tools'} onclick={() => (page = 'tools')}>Tools</button>
-			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}>Kubernetes</button>
+			<button class:active={page === 'dashboard'} onclick={() => (page = 'dashboard')}><Icon name="Home" size={14} /> Dashboard</button>
+			<button class:active={page === 'tools'} onclick={() => (page = 'tools')}><Icon name="Settings" size={14} /> Tools</button>
+			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}><Icon name="Cloud" size={14} /> Kubernetes</button>
 			{#if isAdmin}
-				<button class:active={page === 'admin'} onclick={() => (page = 'admin')}>Admin</button>
+				<button class:active={page === 'admin'} onclick={() => (page = 'admin')}><Icon name="Shield" size={14} /> Admin</button>
 			{/if}
 		</nav>
 		<div class="user">
-			<span>{user.username} <span class="muted">({user.role})</span></span>
-			<button class="btn subtle" onclick={logout}>Sign out</button>
+			<span class="who"><Icon name="User" size={14} /> {user.username} <span class="muted">({user.role})</span></span>
+			<button class="btn subtle signout" onclick={logout}><Icon name="Exit" size={13} /> Sign out</button>
 		</div>
 	</header>
 
@@ -183,7 +185,7 @@
 		{/if}
 	</main>
 
-	<footer>{branding.footerText || 'ServerDash by Blacklink Enterprise. ©2026 Blacklink, Inc. All Rights Reserved.'}</footer>
+	<Footer {branding} />
 {/if}
 
 <style>
@@ -220,6 +222,9 @@
 		flex: 1;
 	}
 	nav button {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
 		background: none;
 		border: none;
 		border-radius: 10px;
@@ -232,6 +237,12 @@
 		background: var(--accent-soft);
 		color: var(--accent);
 		font-weight: 500;
+	}
+	.who,
+	.signout {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 	}
 	.user {
 		display: flex;
@@ -250,11 +261,5 @@
 	.error {
 		color: var(--danger);
 		font-size: 13px;
-	}
-	footer {
-		text-align: center;
-		padding: 20px 24px 28px;
-		color: var(--muted);
-		font-size: 11px;
 	}
 </style>
