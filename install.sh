@@ -1292,7 +1292,7 @@ main "$@"
 SERVERDASH_CLI_EOF
 	chmod 755 "$bin_dir/serverdash"
 
-	if [ -d /etc/bash_completion.d ]; then
+	if [ -d /etc/bash_completion.d ] && [ -w /etc/bash_completion.d ]; then
 		cat >/etc/bash_completion.d/serverdash <<'COMPLETION_EOF'
 _serverdash() {
 	local cur=${COMP_WORDS[COMP_CWORD]}
@@ -1815,9 +1815,16 @@ main() {
 	parse_args "$@"
 	if [ "${UNINSTALL_FLAG:-0}" -eq 1 ]; then
 		[ "$(id -u)" -eq 0 ] || die "must be run as root to uninstall. Try: sudo ./install.sh --uninstall"
-		command -v serverdash >/dev/null 2>&1 || [ -x /usr/local/bin/serverdash ] \
-			|| die "ServerDash doesn't look installed here (no serverdash command found)"
-		exec "$(command -v serverdash || echo /usr/local/bin/serverdash)" uninstall ${UNINSTALL_ARGS[@]+"${UNINSTALL_ARGS[@]}"}
+		local conf="${SERVERDASH_CONF_DIR:-/etc/serverdash}/install.conf"
+		[ -r "$conf" ] || die "ServerDash doesn't look installed here ($conf not found)"
+		# Rewrite the serverdash command from this installer first: installs made
+		# before the uninstaller existed have a CLI without the uninstall command.
+		# shellcheck disable=SC1090
+		INSTALL_DIR="$(. "$conf"; printf '%s' "$SERVERDASH_DIR")"
+		COMPOSE_CMD="$(. "$conf"; printf '%s' "${COMPOSE_CMD:-docker compose}")"
+		RUNTIME="$(. "$conf"; printf '%s' "${RUNTIME:-docker}")"
+		install_cli
+		exec "${SERVERDASH_BIN_DIR:-/usr/local/bin}/serverdash" uninstall ${UNINSTALL_ARGS[@]+"${UNINSTALL_ARGS[@]}"}
 	fi
 	if [ "${WEB_SETUP_FLAG:-0}" -eq 1 ]; then enable_web_setup; fi
 	init_ui
