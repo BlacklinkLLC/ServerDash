@@ -137,8 +137,36 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
+	if err := addColumns(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
 
 	return &Store{DB: db}, nil
+}
+
+// columnMigrations add columns to tables that existed before the column
+// did. CREATE TABLE IF NOT EXISTS won't touch an existing table, so new
+// columns on old databases arrive here instead; each is idempotent.
+var columnMigrations = []struct{ table, column, ddl string }{
+	// JSON: the workflow's trigger (schedule or event) and on-failure alert.
+	// Empty means the legacy daily trigger_time/trigger_tz.
+	{"workflows", "options", `ALTER TABLE workflows ADD COLUMN options TEXT NOT NULL DEFAULT ''`},
+}
+
+func addColumns(db *sql.DB) error {
+	for _, m := range columnMigrations {
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, m.table, m.column).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			if _, err := db.Exec(m.ddl); err != nil {
+				return fmt.Errorf("add %s.%s: %w", m.table, m.column, err)
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Store) Close() error {

@@ -158,16 +158,23 @@ At startup, ServerDash logs exactly where it is storing data, with a loud warnin
 
 ## Workflows
 
-Under Admin → Workflows you can build scheduled automations from a small set of fixed, typed blocks. This is deliberately not a general scripting language, so there is nothing to sandbox beyond what each block already does.
+Admins get an **Automations** tab with four sections: Workflows, Activity (a feed of recent runs across all workflows), Scripts, and Built-in rules.
 
-A workflow is a trigger (for example, "at 00:00 America/Chicago") plus an ordered list of blocks. The classic example is a nightly redeploy of a git-based service:
+A workflow is a trigger plus an ordered list of typed blocks. Start from scratch or from a template (nightly redeploy, disk-space alert, restart a crashed container, and others).
 
-1. **Git Pull**: `dir: /opt/myapp`
-2. **Rebuild & Run**: `dir: /opt/myapp`, `build: true` (runs `docker compose up -d --build`)
+**Triggers:**
+- Schedules: daily, weekly, every N minutes, or a cron expression.
+- Server events: CPU, memory, or disk above a threshold for N minutes; a container stopping or starting; a systemd service changing state. Events are checked every 20 seconds, and each trigger has a cooldown (15 minutes by default).
+- Webhook: `POST /api/hooks/<token>`. The token in the URL is the credential, and the request body is available as `{{payload}}`.
+- Manual only.
 
-Blocks run top to bottom and stop at the first failure. Every run, scheduled or started with "Run now", is logged block by block in the workflow's history.
+**Blocks:** Git Pull, Rebuild & Run, start/stop/restart container, Run Command, Run Script, HTTP request, Notify (Discord, Slack, ntfy, or JSON webhook), systemd service action, Docker prune, Wait, and Check.
 
-**Available blocks:** Git Pull, Rebuild & Run (`docker compose up -d [--build]`), Restart Container, Run Command (arbitrary shell, with an optional working directory), and Wait.
+A **Check** block tests a condition, such as CPU or memory or disk above a value, a container running or stopped, a URL returning 2xx, a command succeeding, or the previous output containing some text. If the condition is false, the run either stops quietly or fails.
+
+Blocks run top to bottom and stop at the first failure, unless the block has "continue on error" set. Text fields can use variables: `{{workflow}}`, `{{trigger}}`, `{{event}}`, `{{payload}}`, `{{output}}` (the previous block's output), `{{host}}`, `{{time}}`, `{{date}}`, `{{cpu}}`, `{{mem}}`, `{{disk}}`, and `{{load}}`. In shell commands the values are quoted safely, and they are also exported as `SERVERDASH_*` environment variables.
+
+Each workflow can post an alert to a Discord, Slack, ntfy, or JSON webhook when a run fails. Every run is logged block by block in the workflow's history.
 
 ### Filesystem access
 

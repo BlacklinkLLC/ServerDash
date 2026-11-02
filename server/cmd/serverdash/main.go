@@ -45,7 +45,7 @@ func main() {
 
 	kubeClient := kubernetes.New(cfg.Kubeconfig)
 
-	runner := automation.NewRunner(db, dockerClient, cfg.ComposeCmd)
+	runner := automation.NewRunner(db, dockerClient, cfg.ComposeCmd, cfg.HostRoot)
 	runner.Start(context.Background())
 	defer runner.Stop()
 

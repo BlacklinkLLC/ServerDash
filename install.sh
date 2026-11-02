@@ -1410,6 +1410,18 @@ edit_admin() {
 	esac
 }
 
+# pick_web_port: ask for the dashboard port, warning if something already listens on it.
+pick_web_port() {
+	while :; do
+		edit_port
+		if command -v ss >/dev/null 2>&1 && ss -Hltn "sport = :$PORT" 2>/dev/null | grep -q .; then
+			printf '  %s%s%s Port %s is already in use on this machine. Pick another.\n' "$YELLOW" "$G_WARN" "$RST" "$PORT"
+			continue
+		fi
+		break
+	done
+}
+
 edit_port() {
 	ask "Port" "$PORT" v_port "host port for the dashboard"
 	if [ "$REPLY" != "$PORT" ]; then PORT=$REPLY; PORT_SET=1; fi
@@ -1459,6 +1471,8 @@ review_settings() {
 	fi
 	if [ "$RUNTIME_FLAG" -eq 0 ]; then choose_runtime; fi
 	if [ "$SETUP_MODE" = web ]; then
+		# The port has to be known before the browser setup screen can be opened.
+		if [ "$PORT_SET" -eq 0 ]; then pick_web_port; fi
 		print_settings
 		return 0
 	fi

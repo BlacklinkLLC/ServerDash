@@ -6,10 +6,7 @@ package automation
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,17 +22,28 @@ type Runner struct {
 	store    *store.Store
 	docker   *containers.Client
 	executor *workflow.Executor
+	hostRoot string
 
 	mu         sync.Mutex
 	cron       *cron.Cron
 	unhealthyC chan struct{}
+
+	// running guards against overlapping runs of one workflow (a slow
+	// deploy on a 1-minute interval, or an event that keeps firing).
+	runMu   sync.Mutex
+	running map[int64]bool
+
+	events *eventWatcher
 }
 
-func NewRunner(st *store.Store, docker *containers.Client, composeCmd []string) *Runner {
+func NewRunner(st *store.Store, docker *containers.Client, composeCmd []string, hostRoot string) *Runner {
 	return &Runner{
 		store:    st,
 		docker:   docker,
-		executor: &workflow.Executor{Docker: docker, ComposeCmd: composeCmd},
+		hostRoot: hostRoot,
+		executor: &workflow.Executor{Docker: docker, ComposeCmd: composeCmd, Store: st, HostRoot: hostRoot},
+		running:  map[int64]bool{},
+		events:   newEventWatcher(),
 	}
 }
 
@@ -47,6 +55,7 @@ func (r *Runner) Start(ctx context.Context) {
 	if r.unhealthyC == nil {
 		r.unhealthyC = make(chan struct{})
 		go r.runUnhealthyLoop(ctx, r.unhealthyC)
+		go r.runEventLoop(ctx, r.unhealthyC)
 	}
 	r.mu.Unlock()
 
@@ -124,10 +133,13 @@ func (r *Runner) Reload(ctx context.Context) error {
 		if !wf.Enabled {
 			continue
 		}
-		spec, err := cronSpecFor(wf)
+		spec, err := workflow.ParseOptions(wf.Options, wf.TriggerTime, wf.TriggerTZ).Trigger.CronSpec()
 		if err != nil {
 			log.Printf("automation: workflow %q has an invalid trigger: %v", wf.Name, err)
 			continue
+		}
+		if spec == "" {
+			continue // event, webhook, or manual trigger: not on the cron schedule
 		}
 		wf := wf
 		if _, err := newCron.AddFunc(spec, func() { r.RunWorkflow(context.Background(), wf, "schedule") }); err != nil {
@@ -147,50 +159,55 @@ func (r *Runner) Reload(ctx context.Context) error {
 	return nil
 }
 
-// cronSpecFor turns a workflow's "HH:MM in this IANA timezone" trigger into
-// a robfig/cron spec. The CRON_TZ= prefix is what lets each workflow run in
-// its own timezone rather than the process's — e.g. "at midnight America/
-// Chicago" keeps firing at local midnight across a DST transition, which a
-// UTC-only cron spec computed once wouldn't.
-func cronSpecFor(wf store.Workflow) (string, error) {
-	parts := strings.SplitN(wf.TriggerTime, ":", 2)
-	if len(parts) != 2 {
-		return "", fmt.Errorf("trigger time %q must be HH:MM", wf.TriggerTime)
-	}
-	hour, err := strconv.Atoi(parts[0])
-	if err != nil || hour < 0 || hour > 23 {
-		return "", fmt.Errorf("invalid hour in %q", wf.TriggerTime)
-	}
-	minute, err := strconv.Atoi(parts[1])
-	if err != nil || minute < 0 || minute > 59 {
-		return "", fmt.Errorf("invalid minute in %q", wf.TriggerTime)
-	}
-	tz := wf.TriggerTZ
-	if tz == "" {
-		tz = "UTC"
-	}
-	return fmt.Sprintf("CRON_TZ=%s %d %d * * *", tz, minute, hour), nil
+// RunWorkflow executes a workflow's blocks and records the result, shared
+// between the cron schedule above and the "run now" button.
+func (r *Runner) RunWorkflow(ctx context.Context, wf store.Workflow, triggeredBy string) {
+	r.RunWorkflowWith(ctx, wf, workflow.Context{Trigger: triggeredBy})
 }
 
-// RunWorkflow executes a workflow's blocks and records the result, shared
-// between the cron schedule above and the admin panel's "run now" button.
-func (r *Runner) RunWorkflow(ctx context.Context, wf store.Workflow, triggeredBy string) {
+// RunWorkflowWith is RunWorkflow with event details (what fired it, a
+// webhook payload) available to the blocks as {{variables}}. It returns
+// false without running if this workflow is already mid-run.
+func (r *Runner) RunWorkflowWith(ctx context.Context, wf store.Workflow, rc workflow.Context) bool {
+	r.runMu.Lock()
+	if r.running[wf.ID] {
+		r.runMu.Unlock()
+		log.Printf("automation: skipping %s run of %q: the previous run is still going", rc.Trigger, wf.Name)
+		return false
+	}
+	r.running[wf.ID] = true
+	r.runMu.Unlock()
+	defer func() {
+		r.runMu.Lock()
+		delete(r.running, wf.ID)
+		r.runMu.Unlock()
+	}()
+
+	rc.Workflow = wf.Name
+	triggeredBy := rc.Trigger
 	runID, err := r.store.StartWorkflowRun(ctx, wf.ID, triggeredBy)
 	if err != nil {
 		log.Printf("automation: record workflow run start for %q: %v", wf.Name, err)
-		return
+		return true
 	}
 
 	blocks, err := workflow.ParseBlocks(wf.Blocks)
 	if err != nil {
 		_ = r.store.FinishWorkflowRun(ctx, runID, false, err.Error())
-		return
+		return true
 	}
 
-	logText, ok := r.executor.Run(ctx, blocks)
+	logText, ok := r.executor.Run(ctx, blocks, rc)
 	if err := r.store.FinishWorkflowRun(ctx, runID, ok, logText); err != nil {
 		log.Printf("automation: record workflow run finish for %q: %v", wf.Name, err)
 	}
+	if !ok {
+		opts := workflow.ParseOptions(wf.Options, wf.TriggerTime, wf.TriggerTZ)
+		if opts.OnFailure.URL != "" {
+			r.executor.SendAlert(ctx, opts.OnFailure, wf.Name, rc, logText)
+		}
+	}
+	return true
 }
 
 func (r *Runner) runUnhealthyLoop(ctx context.Context, stop chan struct{}) {

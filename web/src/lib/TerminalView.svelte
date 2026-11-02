@@ -35,7 +35,7 @@
 	onMount(() => {
 		term = new Terminal({
 			convertEol: true,
-			fontFamily: 'DM Mono, ui-monospace, monospace',
+			fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
 			fontSize: 13,
 			theme: {
 				background: '#0f0f1a',

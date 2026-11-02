@@ -16,6 +16,7 @@ type Workflow struct {
 	TriggerTime string // "HH:MM", 24-hour
 	TriggerTZ   string // IANA zone
 	Blocks      string // raw JSON array
+	Options     string // raw JSON: trigger + on-failure alert ("" = legacy daily trigger)
 	Enabled     bool
 	CreatedBy   sql.NullInt64
 	CreatedAt   time.Time
@@ -32,27 +33,31 @@ type WorkflowRun struct {
 	TriggeredBy string
 }
 
-func (s *Store) CreateWorkflow(ctx context.Context, name, triggerTime, triggerTZ, blocks string, createdBy int64) (Workflow, error) {
+func (s *Store) CreateWorkflow(ctx context.Context, name, triggerTime, triggerTZ, blocks, options string, enabled bool, createdBy int64) (Workflow, error) {
 	now := time.Now()
+	var by any = createdBy
+	if createdBy <= 0 {
+		by = nil
+	}
 	res, err := s.DB.ExecContext(ctx, `
-		INSERT INTO workflows (name, trigger_time, trigger_tz, blocks, enabled, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, 1, ?, ?, ?)
-	`, name, triggerTime, triggerTZ, blocks, createdBy, now, now)
+		INSERT INTO workflows (name, trigger_time, trigger_tz, blocks, options, enabled, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, name, triggerTime, triggerTZ, blocks, options, boolToInt(enabled), by, now, now)
 	if err != nil {
 		return Workflow{}, err
 	}
 	id, _ := res.LastInsertId()
 	return Workflow{
-		ID: id, Name: name, TriggerTime: triggerTime, TriggerTZ: triggerTZ, Blocks: blocks,
-		Enabled: true, CreatedAt: now, UpdatedAt: now,
+		ID: id, Name: name, TriggerTime: triggerTime, TriggerTZ: triggerTZ, Blocks: blocks, Options: options,
+		Enabled: enabled, CreatedAt: now, UpdatedAt: now,
 	}, nil
 }
 
-func (s *Store) UpdateWorkflow(ctx context.Context, id int64, name, triggerTime, triggerTZ, blocks string, enabled bool) error {
+func (s *Store) UpdateWorkflow(ctx context.Context, id int64, name, triggerTime, triggerTZ, blocks, options string, enabled bool) error {
 	res, err := s.DB.ExecContext(ctx, `
-		UPDATE workflows SET name = ?, trigger_time = ?, trigger_tz = ?, blocks = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
+		UPDATE workflows SET name = ?, trigger_time = ?, trigger_tz = ?, blocks = ?, options = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, name, triggerTime, triggerTZ, blocks, boolToInt(enabled), id)
+	`, name, triggerTime, triggerTZ, blocks, options, boolToInt(enabled), id)
 	if err != nil {
 		return err
 	}
@@ -71,9 +76,9 @@ func (s *Store) GetWorkflow(ctx context.Context, id int64) (Workflow, error) {
 	var wf Workflow
 	var enabled int
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT id, name, trigger_time, trigger_tz, blocks, enabled, created_by, created_at, updated_at
+		SELECT id, name, trigger_time, trigger_tz, blocks, options, enabled, created_by, created_at, updated_at
 		FROM workflows WHERE id = ?
-	`, id).Scan(&wf.ID, &wf.Name, &wf.TriggerTime, &wf.TriggerTZ, &wf.Blocks, &enabled, &wf.CreatedBy, &wf.CreatedAt, &wf.UpdatedAt)
+	`, id).Scan(&wf.ID, &wf.Name, &wf.TriggerTime, &wf.TriggerTZ, &wf.Blocks, &wf.Options, &enabled, &wf.CreatedBy, &wf.CreatedAt, &wf.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Workflow{}, ErrNotFound
 	}
@@ -86,7 +91,7 @@ func (s *Store) GetWorkflow(ctx context.Context, id int64) (Workflow, error) {
 
 func (s *Store) ListWorkflows(ctx context.Context) ([]Workflow, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, name, trigger_time, trigger_tz, blocks, enabled, created_by, created_at, updated_at
+		SELECT id, name, trigger_time, trigger_tz, blocks, options, enabled, created_by, created_at, updated_at
 		FROM workflows ORDER BY name
 	`)
 	if err != nil {
@@ -98,7 +103,7 @@ func (s *Store) ListWorkflows(ctx context.Context) ([]Workflow, error) {
 	for rows.Next() {
 		var wf Workflow
 		var enabled int
-		if err := rows.Scan(&wf.ID, &wf.Name, &wf.TriggerTime, &wf.TriggerTZ, &wf.Blocks, &enabled, &wf.CreatedBy, &wf.CreatedAt, &wf.UpdatedAt); err != nil {
+		if err := rows.Scan(&wf.ID, &wf.Name, &wf.TriggerTime, &wf.TriggerTZ, &wf.Blocks, &wf.Options, &enabled, &wf.CreatedBy, &wf.CreatedAt, &wf.UpdatedAt); err != nil {
 			return nil, err
 		}
 		wf.Enabled = enabled != 0
@@ -143,6 +148,33 @@ func (s *Store) ListWorkflowRuns(ctx context.Context, workflowID int64, limit in
 	for rows.Next() {
 		var r WorkflowRun
 		if err := rows.Scan(&r.ID, &r.WorkflowID, &r.StartedAt, &r.FinishedAt, &r.Success, &r.Log, &r.TriggeredBy); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// RecentRun is a run plus its workflow's name, for the activity feed.
+type RecentRun struct {
+	WorkflowRun
+	WorkflowName string
+}
+
+func (s *Store) ListRecentWorkflowRuns(ctx context.Context, limit int) ([]RecentRun, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT r.id, r.workflow_id, r.started_at, r.finished_at, r.success, r.log, r.triggered_by, w.name
+		FROM workflow_runs r JOIN workflows w ON w.id = r.workflow_id
+		ORDER BY r.started_at DESC LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []RecentRun{}
+	for rows.Next() {
+		var r RecentRun
+		if err := rows.Scan(&r.ID, &r.WorkflowID, &r.StartedAt, &r.FinishedAt, &r.Success, &r.Log, &r.TriggeredBy, &r.WorkflowName); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

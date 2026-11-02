@@ -1,5 +1,6 @@
 /* Design tokens matched to nova.blacklink.net (Blacklink's NOVA design
-   system) — dark-first, amber accent, Syne + DM Mono type. */
+   system) — dark-first, amber accent, Syne headings + Google Sans UI type,
+   with the system monospace reserved for code, logs, and terminals. */
 :root {
 	color-scheme: dark;
 	--bg: #08080f;
@@ -29,7 +30,8 @@
 	--card-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 	--radius: 13px;
 	--font-display: 'Syne', system-ui, sans-serif;
-	--font-mono: 'DM Mono', ui-monospace, monospace;
+	--font-sans: 'Google Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
 /* Themes: each overrides surface/ink tokens only; the accent stays the
@@ -111,7 +113,7 @@
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--muted);
-	font-family: var(--font-mono);
+	font-family: var(--font-sans);
 }
 .status-dot {
 	display: inline-block;
@@ -132,7 +134,7 @@ body {
 	margin: 0;
 	background: var(--bg);
 	color: var(--text);
-	font-family: var(--font-mono);
+	font-family: var(--font-sans);
 	font-size: 13px;
 }
 
@@ -161,7 +163,7 @@ pre {
 	color: var(--text);
 	border-radius: 12px;
 	padding: 11px 14px;
-	font-family: var(--font-mono);
+	font-family: var(--font-sans);
 	font-size: 12px;
 	transition:
 		transform 0.15s ease,
@@ -212,7 +214,7 @@ pre {
 	gap: 5px;
 	padding: 5px 10px;
 	border-radius: 999px;
-	font-family: var(--font-mono);
+	font-family: var(--font-sans);
 	font-size: 10px;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
@@ -263,7 +265,7 @@ textarea {
 	border-radius: 14px;
 	background: var(--sur2);
 	color: var(--text);
-	font-family: var(--font-mono);
+	font-family: var(--font-sans);
 	font-size: 13px;
 	padding: 12px 13px;
 	outline: none;
@@ -282,7 +284,7 @@ textarea:focus {
 table.token-table {
 	width: 100%;
 	border-collapse: collapse;
-	font-family: var(--font-mono);
+	font-family: var(--font-sans);
 	font-size: 12px;
 	border-radius: 12px;
 	border: 1px solid var(--border);

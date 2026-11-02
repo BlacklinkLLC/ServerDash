@@ -7,6 +7,7 @@
 	import KubernetesView from './lib/KubernetesView.svelte';
 	import ToolsView from './lib/ToolsView.svelte';
 	import ClusterView from './lib/ClusterView.svelte';
+	import AutomationsView from './lib/automations/AutomationsView.svelte';
 	import AdminPanel from './lib/admin/AdminPanel.svelte';
 	import SetupPage from './lib/SetupPage.svelte';
 	import LoginPage from './lib/LoginPage.svelte';
@@ -20,7 +21,7 @@
 	let branding = $state({ appName: 'ServerDash', logoUrl: null, accentColor: '#ffb020', showSystem: true, showContainers: true, refreshSeconds: 5, widgets: [] });
 	let runtime = $state(null);
 
-	const pages = ['dashboard', 'tools', 'kubernetes', 'cluster', 'admin'];
+	const pages = ['dashboard', 'tools', 'kubernetes', 'cluster', 'automations', 'admin'];
 	// The page lives in the URL hash so a refresh or shared link lands on it.
 	let page = $state(pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard');
 	$effect(() => {
@@ -52,7 +53,7 @@
 		topProcesses = null;
 		runtime = null;
 		host = null;
-		if (page === 'cluster' || page === 'admin') page = 'dashboard';
+		if (page === 'cluster' || page === 'admin' || page === 'automations') page = 'dashboard';
 		refresh();
 	}
 	let error = $state(null);
@@ -180,6 +181,7 @@
 			<button class:active={page === 'cluster'} onclick={() => (page = 'cluster')}><Icon name="Connect" size={14} /> Cluster</button>
 			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}><Icon name="Cloud" size={14} /> Kubernetes</button>
 			{#if isAdmin && !target}
+				<button class:active={page === 'automations'} onclick={() => (page = 'automations')}><Icon name="Lightning" size={14} /> Automations</button>
 				<button class:active={page === 'admin'} onclick={() => (page = 'admin')}><Icon name="Shield" size={14} /> Admin</button>
 			{/if}
 		</nav>
@@ -242,6 +244,8 @@
 			/>
 		{:else if page === 'kubernetes'}
 			<KubernetesView {canOperate} />
+		{:else if page === 'automations'}
+			<AutomationsView />
 		{:else if page === 'admin'}
 			<AdminPanel currentUserId={user.id} {branding} onbrandingchange={onBrandingChange} />
 		{/if}
@@ -291,7 +295,7 @@
 		border: none;
 		border-radius: 10px;
 		padding: 7px 14px;
-		font-family: var(--font-mono);
+		font-family: var(--font-sans);
 		font-size: 12px;
 		color: var(--muted);
 	}

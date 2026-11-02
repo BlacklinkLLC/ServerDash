@@ -76,6 +76,9 @@ func UserFromContext(ctx context.Context) (store.User, bool) {
 type Middleware struct {
 	Store       *store.Store
 	PublicPaths map[string]bool
+	// PublicPrefixes are "METHOD /path/prefix/" entries for public routes
+	// with a path parameter (e.g. webhook URLs carrying their own token).
+	PublicPrefixes []string
 	// ClusterAuth, if set, authenticates requests a cluster primary
 	// proxies to this node (no session cookie, a shared-secret header
 	// instead). ok=false means "not a cluster request": fall through to
@@ -88,6 +91,12 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		if m.PublicPaths[r.Method+" "+r.URL.Path] {
 			next.ServeHTTP(w, r)
 			return
+		}
+		for _, p := range m.PublicPrefixes {
+			if strings.HasPrefix(r.Method+" "+r.URL.Path, p) {
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 
 		if m.ClusterAuth != nil {

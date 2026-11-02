@@ -142,6 +142,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/workflows/{id}", auth.RequireRole(s.handleDeleteWorkflow, store.RoleAdmin))
 	mux.HandleFunc("POST /api/workflows/{id}/run", auth.RequireRole(s.handleRunWorkflow, store.RoleAdmin))
 	mux.HandleFunc("GET /api/workflows/{id}/runs", auth.RequireRole(s.handleListWorkflowRuns, store.RoleAdmin))
+	mux.HandleFunc("GET /api/workflow-runs", auth.RequireRole(s.handleRecentWorkflowRuns, store.RoleAdmin))
+	mux.HandleFunc("POST /api/hooks/{token}", s.handleWorkflowHook)
 
 	// --- Cluster: primaries, nodes, replicas ---
 	mux.HandleFunc("GET /api/cluster", s.handleClusterOverview)
@@ -167,7 +169,13 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/updates/status", auth.RequireRole(s.handleUpdateStatus, store.RoleAdmin))
 	mux.HandleFunc("POST /api/updates/apply", auth.RequireRole(s.handleApplyUpdate, store.RoleAdmin))
 
-	authMW := &auth.Middleware{Store: s.store, PublicPaths: publicPaths, ClusterAuth: s.clusterAuth}
+	authMW := &auth.Middleware{
+		Store:       s.store,
+		PublicPaths: publicPaths,
+		// Workflow webhooks: the random token in the path is the credential.
+		PublicPrefixes: []string{"POST /api/hooks/"},
+		ClusterAuth:    s.clusterAuth,
+	}
 	return withLogging(withStatic(s.cfg.WebDir, withCORS(s.cfg.PublicHost, authMW.Wrap(mux))))
 }
 

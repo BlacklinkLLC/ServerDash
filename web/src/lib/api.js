@@ -132,6 +132,8 @@ export const api = {
 	deleteWorkflow: (id) => del(`/api/workflows/${id}`),
 	runWorkflow: (id) => post(`/api/workflows/${id}/run`),
 	workflowRuns: (id) => request(`/api/workflows/${id}/runs`),
+	recentWorkflowRuns: (limit = 50) => request(`/api/workflow-runs?limit=${limit}`),
+	workflowHookUrl: (token) => `${window.location.origin}/api/hooks/${token}`,
 
 	// --- Cluster ---
 	cluster: () => request('/api/cluster'),
