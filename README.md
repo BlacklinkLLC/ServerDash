@@ -106,7 +106,7 @@ cd web && npm install && npm run dev
 ## Installing on a server
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/turkfork/ServerDash/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/BlacklinkLLC/ServerDash/main/install.sh | sudo bash
 ```
 
 Installs Docker (or Podman with `--runtime podman`), clones ServerDash to
