@@ -5,6 +5,7 @@
 	import SystemOverview from './lib/SystemOverview.svelte';
 	import ContainerList from './lib/ContainerList.svelte';
 	import KubernetesView from './lib/KubernetesView.svelte';
+	import ToolsView from './lib/ToolsView.svelte';
 	import AdminPanel from './lib/admin/AdminPanel.svelte';
 	import SetupPage from './lib/SetupPage.svelte';
 	import LoginPage from './lib/LoginPage.svelte';
@@ -13,13 +14,20 @@
 	// 'loading' | 'setup' | 'login' | 'ready'
 	let authState = $state('loading');
 	let user = $state(null);
-	let branding = $state({ appName: 'ServerDash', logoUrl: null, accentColor: '#ffb020', showSystem: true, showContainers: true });
+	let branding = $state({ appName: 'ServerDash', logoUrl: null, accentColor: '#ffb020', showSystem: true, showContainers: true, refreshSeconds: 5, widgets: [] });
 	let runtime = $state(null);
 
-	let page = $state('dashboard'); // 'dashboard' | 'kubernetes' | 'admin'
+	const pages = ['dashboard', 'tools', 'kubernetes', 'admin'];
+	// The page lives in the URL hash so a refresh or shared link lands on it.
+	let page = $state(pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard');
+	$effect(() => {
+		history.replaceState(null, '', `#${page}`);
+	});
 
 	let snapshot = $state(null);
 	let containers = $state([]);
+	let metricsHistory = $state([]);
+	let topProcesses = $state(null);
 	let error = $state(null);
 
 	async function loadBranding() {
@@ -29,8 +37,14 @@
 			// Falls back to the default name/no logo — branding is cosmetic,
 			// never worth blocking the rest of the app over.
 		}
+		applyBranding();
+	}
+
+	function applyBranding() {
 		document.title = branding.appName;
 		applyAccentColor(branding.accentColor || '#ffb020');
+		document.documentElement.dataset.theme = branding.theme || 'dark';
+		document.documentElement.dataset.density = branding.density || 'comfortable';
 	}
 
 	async function resolveAuth() {
@@ -76,6 +90,16 @@
 			}
 			error = e.message;
 		}
+		if (page === 'dashboard') {
+			api.systemHistory()
+				.then((h) => (metricsHistory = h))
+				.catch(() => {});
+			if (canOperate) {
+				api.processes('cpu', 6)
+					.then((p) => (topProcesses = p))
+					.catch(() => {});
+			}
+		}
 		api.runtime()
 			.then((r) => (runtime = r))
 			.catch(() => {});
@@ -87,8 +111,9 @@
 	});
 	$effect(() => {
 		if (authState === 'ready') {
+			page;
 			refresh();
-			timer = setInterval(refresh, 5000);
+			timer = setInterval(refresh, (branding.refreshSeconds || 5) * 1000);
 			return () => clearInterval(timer);
 		}
 	});
@@ -99,8 +124,7 @@
 
 	function onBrandingChange(updated) {
 		branding = updated;
-		document.title = branding.appName;
-		applyAccentColor(branding.accentColor || '#ffb020');
+		applyBranding();
 	}
 </script>
 
@@ -118,6 +142,7 @@
 		</div>
 		<nav>
 			<button class:active={page === 'dashboard'} onclick={() => (page = 'dashboard')}>Dashboard</button>
+			<button class:active={page === 'tools'} onclick={() => (page = 'tools')}>Tools</button>
 			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}>Kubernetes</button>
 			{#if isAdmin}
 				<button class:active={page === 'admin'} onclick={() => (page = 'admin')}>Admin</button>
@@ -136,11 +161,21 @@
 
 		{#if page === 'dashboard'}
 			{#if branding.showSystem}
-				<SystemOverview {snapshot} {runtime} />
+				<SystemOverview
+					{snapshot}
+					{runtime}
+					history={metricsHistory}
+					{containers}
+					processes={topProcesses}
+					settings={branding}
+					onnavigate={(p) => (page = p)}
+				/>
 			{/if}
 			{#if branding.showContainers}
 				<ContainerList {containers} {canOperate} {isAdmin} onaction={refresh} />
 			{/if}
+		{:else if page === 'tools'}
+			<ToolsView {isAdmin} refreshSeconds={branding.refreshSeconds || 5} />
 		{:else if page === 'kubernetes'}
 			<KubernetesView {canOperate} />
 		{:else if page === 'admin'}
@@ -148,7 +183,7 @@
 		{/if}
 	</main>
 
-	<footer>ServerDash by Blacklink Enterprise. ©2026 Blacklink, Inc. All Rights Reserved.</footer>
+	<footer>{branding.footerText || 'ServerDash by Blacklink Enterprise. ©2026 Blacklink, Inc. All Rights Reserved.'}</footer>
 {/if}
 
 <style>
@@ -205,7 +240,7 @@
 		font-size: 12px;
 	}
 	main {
-		max-width: 980px;
+		max-width: 1180px;
 		margin: 0 auto;
 		padding: 28px 24px;
 		display: flex;

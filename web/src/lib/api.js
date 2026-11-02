@@ -50,6 +50,11 @@ export const api = {
 	// --- System / runtime ---
 	system: () => request('/api/system'),
 	runtime: () => request('/api/runtime'),
+	systemHistory: () => request('/api/system/history'),
+	processes: (sort = 'cpu', limit = 0) => request(`/api/system/processes?sort=${sort}&limit=${limit}`),
+	signalProcess: (pid, signal) => post(`/api/system/processes/${pid}/signal`, { signal }),
+	ports: () => request('/api/system/ports'),
+	interfaces: () => request('/api/system/interfaces'),
 
 	// --- Containers (Docker/Podman) ---
 	containers: () => request('/api/containers'),

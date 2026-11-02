@@ -21,6 +21,8 @@
 	--success: #65db93;
 	--success-soft: rgba(101, 219, 147, 0.12);
 	--success-border: rgba(101, 219, 147, 0.25);
+	--warning: #f5c542;
+	--warning-soft: rgba(245, 197, 66, 0.12);
 	--danger: #ff6f71;
 	--danger-soft: rgba(255, 111, 113, 0.12);
 	--shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
@@ -29,6 +31,98 @@
 	--font-display: 'Syne', system-ui, sans-serif;
 	--font-mono: 'DM Mono', ui-monospace, monospace;
 }
+
+/* Themes: each overrides surface/ink tokens only; the accent stays the
+   admin's chosen brand color across all of them. */
+:root[data-theme='midnight'] {
+	--bg: #050b18;
+	--surface: #0a1426;
+	--sur2: #0f1b31;
+	--sur3: #14223b;
+	--border: #1a2a47;
+	--border2: #233657;
+	--muted: #5d6f92;
+	--muted-strong: #c3cde3;
+}
+:root[data-theme='terminal'] {
+	--bg: #030503;
+	--surface: #070b07;
+	--sur2: #0c120c;
+	--sur3: #111a11;
+	--border: #182418;
+	--border2: #213221;
+	--text: #d5f5d5;
+	--muted: #4f6a4f;
+	--muted-strong: #b5d8b5;
+}
+:root[data-theme='light'] {
+	color-scheme: light;
+	--bg: #f4f4f8;
+	--surface: #ffffff;
+	--sur2: #f0f0f5;
+	--sur3: #e7e7ef;
+	--border: #e0e0ea;
+	--border2: #cfcfdc;
+	--text: #16161f;
+	--muted: #6b6b82;
+	--muted-strong: #3a3a4c;
+	--success: #1f9d55;
+	--warning: #b7860b;
+	--danger: #d83a3d;
+	--danger-soft: rgba(216, 58, 61, 0.1);
+	--shadow: 0 10px 30px rgba(20, 20, 40, 0.08);
+	--card-shadow: 0 10px 30px rgba(20, 20, 40, 0.08);
+}
+:root[data-theme='light'] .btn {
+	background: var(--surface);
+}
+:root[data-theme='light'] .btn.danger {
+	color: var(--danger);
+}
+:root[data-density='compact'] body {
+	font-size: 12px;
+}
+:root[data-density='compact'] table.token-table td {
+	padding: 6px 12px;
+}
+
+/* Shared panel used by overview widgets and tools. */
+.panel {
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 50%),
+		var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	padding: 18px;
+	min-width: 0;
+}
+:root[data-density='compact'] .panel {
+	padding: 12px;
+	border-radius: 12px;
+}
+.panel-title {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin: 0 0 12px;
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+	font-family: var(--font-mono);
+}
+.status-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--muted);
+}
+.status-dot.good { background: var(--success); }
+.status-dot.warning { background: var(--warning); }
+.status-dot.critical { background: var(--danger); }
 
 * {
 	box-sizing: border-box;

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,15 @@ const (
 	defaultAccent     = "#ffb020" // NOVA's amber — matches app.css's --accent default
 	maxAppNameLength  = 60
 	maxLogoUploadSize = 2 << 20 // 2MB — plenty for a logo, small enough to not be a DoS vector
+)
+
+var (
+	validThemes    = map[string]bool{"dark": true, "midnight": true, "light": true, "terminal": true}
+	validDensities = map[string]bool{"comfortable": true, "compact": true}
+	// validWidgets are the overview's widget ids; the order an admin saves
+	// them in is the order they render.
+	validWidgets = []string{"health", "gauges", "cpuChart", "memChart", "netChart", "cores", "disks", "containers", "processes"}
+	maxFooterLen = 200
 )
 
 var accentColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -41,11 +51,34 @@ func (s *Server) brandingDir() string {
 // render the operator's branding before anyone has signed in, plus the
 // appearance/customization options the dashboard reads once signed in.
 type settingsResponse struct {
-	AppName        string  `json:"appName"`
-	LogoURL        *string `json:"logoUrl,omitempty"`
-	AccentColor    string  `json:"accentColor"`
-	ShowSystem     bool    `json:"showSystem"`
-	ShowContainers bool    `json:"showContainers"`
+	AppName        string   `json:"appName"`
+	LogoURL        *string  `json:"logoUrl,omitempty"`
+	AccentColor    string   `json:"accentColor"`
+	ShowSystem     bool     `json:"showSystem"`
+	ShowContainers bool     `json:"showContainers"`
+	Theme          string   `json:"theme"`
+	Density        string   `json:"density"`
+	RefreshSeconds int      `json:"refreshSeconds"`
+	WarnThreshold  int      `json:"warnThreshold"`
+	CritThreshold  int      `json:"critThreshold"`
+	Widgets        []string `json:"widgets"`
+	FooterText     string   `json:"footerText"`
+}
+
+func settingString(s *Server, r *http.Request, key, def string) string {
+	if v, ok, _ := s.store.GetSetting(r.Context(), key); ok && v != "" {
+		return v
+	}
+	return def
+}
+
+func settingInt(s *Server, r *http.Request, key string, def int) int {
+	if v, ok, _ := s.store.GetSetting(r.Context(), key); ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
 }
 
 func (s *Server) currentSettings(r *http.Request) settingsResponse {
@@ -63,6 +96,19 @@ func (s *Server) currentSettings(r *http.Request) settingsResponse {
 		AccentColor:    accent,
 		ShowSystem:     settingBool(s, r, "dashboard_show_system", true),
 		ShowContainers: settingBool(s, r, "dashboard_show_containers", true),
+		Theme:          settingString(s, r, "theme", "dark"),
+		Density:        settingString(s, r, "density", "comfortable"),
+		RefreshSeconds: settingInt(s, r, "refresh_seconds", 5),
+		WarnThreshold:  settingInt(s, r, "warn_threshold", 75),
+		CritThreshold:  settingInt(s, r, "crit_threshold", 90),
+		Widgets:        validWidgets,
+		FooterText:     settingString(s, r, "footer_text", ""),
+	}
+	if v, ok, _ := s.store.GetSetting(r.Context(), "overview_widgets"); ok {
+		var ws []string
+		if json.Unmarshal([]byte(v), &ws) == nil {
+			resp.Widgets = ws
+		}
 	}
 	if ext, ok, _ := s.store.GetSetting(r.Context(), "logo_ext"); ok && ext != "" {
 		version, _, _ := s.store.GetSetting(r.Context(), "logo_updated_at")
@@ -85,15 +131,91 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateSettingsRequest struct {
-	AppName        string `json:"appName"`
-	AccentColor    string `json:"accentColor"`
-	ShowSystem     *bool  `json:"showSystem"`
-	ShowContainers *bool  `json:"showContainers"`
+	AppName        string    `json:"appName"`
+	AccentColor    string    `json:"accentColor"`
+	ShowSystem     *bool     `json:"showSystem"`
+	ShowContainers *bool     `json:"showContainers"`
+	Theme          *string   `json:"theme"`
+	Density        *string   `json:"density"`
+	RefreshSeconds *int      `json:"refreshSeconds"`
+	WarnThreshold  *int      `json:"warnThreshold"`
+	CritThreshold  *int      `json:"critThreshold"`
+	Widgets        *[]string `json:"widgets"`
+	FooterText     *string   `json:"footerText"`
+}
+
+// validateAppearance checks the optional appearance fields and returns the
+// settings keys/values to persist, so nothing is written if any is invalid.
+func validateAppearance(req updateSettingsRequest) (map[string]string, error) {
+	out := map[string]string{}
+	if req.Theme != nil {
+		if !validThemes[*req.Theme] {
+			return nil, fmt.Errorf("unknown theme %q", *req.Theme)
+		}
+		out["theme"] = *req.Theme
+	}
+	if req.Density != nil {
+		if !validDensities[*req.Density] {
+			return nil, fmt.Errorf("unknown density %q", *req.Density)
+		}
+		out["density"] = *req.Density
+	}
+	if req.RefreshSeconds != nil {
+		if *req.RefreshSeconds < 2 || *req.RefreshSeconds > 300 {
+			return nil, errors.New("refresh interval must be between 2 and 300 seconds")
+		}
+		out["refresh_seconds"] = strconv.Itoa(*req.RefreshSeconds)
+	}
+	warn, crit := -1, -1
+	if req.WarnThreshold != nil {
+		warn = *req.WarnThreshold
+		out["warn_threshold"] = strconv.Itoa(warn)
+	}
+	if req.CritThreshold != nil {
+		crit = *req.CritThreshold
+		out["crit_threshold"] = strconv.Itoa(crit)
+	}
+	for _, t := range []int{warn, crit} {
+		if t != -1 && (t < 1 || t > 100) {
+			return nil, errors.New("thresholds must be between 1 and 100")
+		}
+	}
+	if warn != -1 && crit != -1 && warn >= crit {
+		return nil, errors.New("warning threshold must be below the critical threshold")
+	}
+	if req.Widgets != nil {
+		known := map[string]bool{}
+		for _, w := range validWidgets {
+			known[w] = true
+		}
+		seen := map[string]bool{}
+		for _, w := range *req.Widgets {
+			if !known[w] || seen[w] {
+				return nil, fmt.Errorf("unknown or duplicate widget %q", w)
+			}
+			seen[w] = true
+		}
+		b, _ := json.Marshal(*req.Widgets)
+		out["overview_widgets"] = string(b)
+	}
+	if req.FooterText != nil {
+		f := strings.TrimSpace(*req.FooterText)
+		if len(f) > maxFooterLen {
+			return nil, fmt.Errorf("footer text must be %d characters or fewer", maxFooterLen)
+		}
+		out["footer_text"] = f
+	}
+	return out, nil
 }
 
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req updateSettingsRequest
 	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	appearance, err := validateAppearance(req)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
@@ -130,6 +252,13 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ShowContainers != nil {
 		if err := s.store.SetSetting(r.Context(), "dashboard_show_containers", strconv.FormatBool(*req.ShowContainers)); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
+	for k, v := range appearance {
+		if err := s.store.SetSetting(r.Context(), k, v); err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
 		}

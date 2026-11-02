@@ -8,6 +8,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 	_ "time/tzdata" // embeds the IANA zone database in the binary: the Alpine base image doesn't ship it, and without this, a workflow's "CRON_TZ=America/Chicago ..." trigger silently fails to register
 
 	"serverdash/internal/api"
@@ -16,6 +17,7 @@ import (
 	"serverdash/internal/containers"
 	"serverdash/internal/kubernetes"
 	"serverdash/internal/store"
+	"serverdash/internal/system"
 )
 
 func main() {
@@ -46,7 +48,11 @@ func main() {
 	runner.Start(context.Background())
 	defer runner.Stop()
 
-	srv := api.New(cfg, dockerClient, db, kubeClient, runner)
+	// 5s samples × 720 = one hour of chart history for the overview.
+	sampler := system.NewSampler(5*time.Second, 720)
+	sampler.Start(context.Background())
+
+	srv := api.New(cfg, dockerClient, db, kubeClient, runner, sampler)
 
 	log.Printf("serverdash API listening on %s (container runtime: %s, kubernetes: %v, public host: %s)",
 		cfg.ListenAddr, cfg.DockerHost, kubernetes.Available(), cfg.PublicHost)

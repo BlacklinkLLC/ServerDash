@@ -33,6 +33,14 @@ type Snapshot struct {
 	MemTotalBytes  uint64      `json:"memTotalBytes"`
 	MemUsedBytes   uint64      `json:"memUsedBytes"`
 	MemUsedPercent float64     `json:"memUsedPercent"`
+	SwapTotalBytes uint64      `json:"swapTotalBytes"`
+	SwapUsedBytes  uint64      `json:"swapUsedBytes"`
+	SwapPercent    float64     `json:"swapPercent"`
+	CPUModel       string      `json:"cpuModel"`
+	PerCoreCPU     []float64   `json:"perCoreCpu"`
+	ProcessCount   uint64      `json:"processCount"`
+	Arch           string      `json:"arch"`
+	BootTime       uint64      `json:"bootTime"`
 	Disks          []DiskUsage `json:"disks"`
 	CollectedAt    time.Time   `json:"collectedAt"`
 }
@@ -55,10 +63,19 @@ func Collect(hostRoot string) (Snapshot, error) {
 		snap.Platform = hi.Platform + " " + hi.PlatformVersion
 		snap.KernelVersion = hi.KernelVersion
 		snap.UptimeSeconds = hi.Uptime
+		snap.ProcessCount = hi.Procs
+		snap.Arch = hi.KernelArch
+		snap.BootTime = hi.BootTime
 	}
 
 	if pct, err := cpu.Percent(0, false); err == nil && len(pct) > 0 {
 		snap.CPUPercent = pct[0]
+	}
+	if per, err := cpu.Percent(0, true); err == nil {
+		snap.PerCoreCPU = per
+	}
+	if infos, err := cpu.Info(); err == nil && len(infos) > 0 {
+		snap.CPUModel = infos[0].ModelName
 	}
 	if counts, err := cpu.Counts(true); err == nil {
 		snap.CPUCores = counts
@@ -74,6 +91,12 @@ func Collect(hostRoot string) (Snapshot, error) {
 		snap.MemTotalBytes = vm.Total
 		snap.MemUsedBytes = vm.Used
 		snap.MemUsedPercent = vm.UsedPercent
+	}
+
+	if sw, err := mem.SwapMemory(); err == nil {
+		snap.SwapTotalBytes = sw.Total
+		snap.SwapUsedBytes = sw.Used
+		snap.SwapPercent = sw.UsedPercent
 	}
 
 	if parts, err := disk.Partitions(false); err == nil {

@@ -24,3 +24,21 @@ export function formatPercent(value) {
 	if (value === null || value === undefined) return '—';
 	return `${value.toFixed(1)}%`;
 }
+
+export function formatRate(bytesPerSec) {
+	return `${formatBytes(bytesPerSec)}/s`;
+}
+
+/** Maps a percent to a status level using the admin-configured thresholds. */
+export function statusFor(percent, warn = 75, crit = 90) {
+	if (percent === null || percent === undefined) return 'unknown';
+	if (percent >= crit) return 'critical';
+	if (percent >= warn) return 'warning';
+	return 'good';
+}
+
+export const statusLabel = { good: 'Healthy', warning: 'Elevated', critical: 'Critical', unknown: 'Unknown' };
+
+export function formatClock(date) {
+	return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}

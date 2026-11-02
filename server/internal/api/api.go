@@ -16,6 +16,7 @@ import (
 	"serverdash/internal/containers"
 	"serverdash/internal/kubernetes"
 	"serverdash/internal/store"
+	"serverdash/internal/system"
 )
 
 type Server struct {
@@ -24,11 +25,13 @@ type Server struct {
 	store      *store.Store
 	kube       *kubernetes.Client
 	automation *automation.Runner
+	sampler    *system.Sampler
 	upgrader   websocket.Upgrader
 }
 
-func New(cfg config.Config, docker *containers.Client, st *store.Store, kube *kubernetes.Client, runner *automation.Runner) *Server {
+func New(cfg config.Config, docker *containers.Client, st *store.Store, kube *kubernetes.Client, runner *automation.Runner, sampler *system.Sampler) *Server {
 	return &Server{
+		sampler:    sampler,
 		cfg:        cfg,
 		docker:     docker,
 		store:      st,
@@ -78,6 +81,14 @@ func (s *Server) Routes() http.Handler {
 	// --- System / runtime ---
 	mux.HandleFunc("GET /api/system", s.handleSystem)
 	mux.HandleFunc("GET /api/runtime", s.handleRuntimeInfo)
+	mux.HandleFunc("GET /api/system/history", s.handleSystemHistory)
+	mux.HandleFunc("GET /api/system/interfaces", s.handleInterfaces)
+	// Process command lines and socket owners can leak secrets (tokens in
+	// argv), so these tools are limited to operators and admins; sending
+	// signals is admin-only, matching the terminal.
+	mux.HandleFunc("GET /api/system/processes", auth.RequireRole(s.handleProcesses, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("GET /api/system/ports", auth.RequireRole(s.handlePorts, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("POST /api/system/processes/{pid}/signal", auth.RequireRole(s.handleSignalProcess, store.RoleAdmin))
 
 	// --- Containers (Docker/Podman) ---
 	mux.HandleFunc("GET /api/containers", s.handleListContainers)
