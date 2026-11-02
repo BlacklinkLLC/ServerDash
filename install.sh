@@ -1723,6 +1723,9 @@ parse_args() {
 }
 
 main() {
+	# Run from a directory that is sure to exist. If the shell is still in a
+	# deleted install directory, git and other tools fail with getcwd errors.
+	cd / 2>/dev/null || true
 	ORIG_ARGS=("$@")
 	T0=$SECONDS
 	parse_args "$@"
