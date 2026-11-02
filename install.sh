@@ -5,11 +5,14 @@
 # systemd-managed `docker compose` (or `podman compose`) service.
 #
 # Run it interactively and it walks you through the setup:
-#   curl -fsSL https://raw.githubusercontent.com/turkfork/ServerDash/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/BlacklinkLLC/ServerDash/main/install.sh | sudo bash
 #   sudo ./install.sh
 #
 # Or script it. Any flag you pass is used as the default, and --yes skips every
 # prompt. Without a terminal (CI, cron, ssh -T) it never prompts.
+#
+# It creates the first admin login for you (a generated password, shown once at the
+# end, unless you choose your own or pass --no-admin to use the setup screen).
 #
 # It also installs a `serverdash` command, so you can change settings later:
 #   serverdash config          edit settings (port, public host, ...) interactively
@@ -22,7 +25,7 @@
 
 set -euo pipefail
 
-REPO_URL="${SERVERDASH_REPO_URL:-https://github.com/turkfork/ServerDash.git}"
+REPO_URL="${SERVERDASH_REPO_URL:-https://github.com/BlacklinkLLC/ServerDash.git}"
 UNIT_DIR="${SERVERDASH_UNIT_DIR:-/etc/systemd/system}"
 
 RUNTIME=""
@@ -35,6 +38,11 @@ START_SERVICE=1
 ASSUME_YES=0
 PORT_SET=0
 HOST_SET=0
+ADMIN_MODE=generate              # generate | custom | skip
+ADMIN_USER="admin"
+ADMIN_PASS="${SERVERDASH_ADMIN_PASSWORD:-}"
+ADMIN_RESULT=""                  # created | exists | failed | "" (not attempted)
+if [ -n "$ADMIN_PASS" ]; then ADMIN_MODE=custom; fi
 
 SCRIPT_PATH=""
 SCRIPT_DIR=""
@@ -53,6 +61,7 @@ COMPOSE_CMD=""
 LOG=""
 BG_PID=""
 STEP_SOFT=0
+STEP_RC=0
 MENU_RESULT=0
 PANEL_LINES=0
 ANIM=0
@@ -66,7 +75,7 @@ usage() {
 ServerDash installer
 
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/turkfork/ServerDash/main/install.sh | sudo bash
+  curl -fsSL https://raw.githubusercontent.com/BlacklinkLLC/ServerDash/main/install.sh | sudo bash
   sudo ./install.sh [options]
 
 Options:
@@ -76,6 +85,12 @@ Options:
   --port PORT               Host port to publish the dashboard on (default: 9900).
                             Also updates an existing install's .env.
   --branch NAME             Git branch/tag to install (default: main)
+  --admin-user NAME         Username for the first admin login (default: admin)
+  --admin-password PASS     Password for it (8+ chars). Visible in `ps`, so prefer
+                            the SERVERDASH_ADMIN_PASSWORD environment variable.
+                            Without one, a random password is generated and shown
+                            once at the end.
+  --no-admin                Don't create a login; use the browser setup screen
   --no-start                Install and build, but don't enable/start the service
   -y, --yes                 Don't prompt; use the flags and defaults as given
   -h, --help                Show this help
@@ -303,6 +318,39 @@ ask() {
 	done
 }
 
+# ask_secret LABEL -> REPLY   (hidden input, asked twice, validated)
+ask_secret() {
+	local label=$1 p1 p2 err extra=0
+	while :; do
+		printf '  %s%s%s  %sinput is hidden%s\n' "$BOLD" "$label" "$RST" "$DIM" "$RST"
+		printf '  %s%s%s ' "$AMBER" "$G_SEL" "$RST"
+		p1=""
+		IFS= read -rs p1 </dev/tty || true
+		printf '\n  %sRepeat it%s\n  %s%s%s ' "$BOLD" "$RST" "$AMBER" "$G_SEL" "$RST"
+		p2=""
+		IFS= read -rs p2 </dev/tty || true
+		printf '\n'
+		err=""
+		if ! err="$(v_password "$p1")"; then :
+		elif [ "$p1" != "$p2" ]; then err="Those didn't match"
+		fi
+		erase_up $((4 + extra))
+		if [ -z "$err" ]; then
+			REPLY=$p1
+			return 0
+		fi
+		printf '  %s%s%s %s\n' "$RED" "$G_FAIL" "$RST" "$err"
+		extra=$((extra + 1))
+	done
+}
+
+gen_password() { # 16 unambiguous characters, grouped for easy copying
+	local raw
+	raw="$({ LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom 2>/dev/null | head -c 16; } || true)"
+	[ "${#raw}" -eq 16 ] || die "could not generate a password (is /dev/urandom readable?)"
+	printf '%s-%s-%s-%s' "${raw:0:4}" "${raw:4:4}" "${raw:8:4}" "${raw:12:4}"
+}
+
 # ───────────────────────────── validators ─────────────────────────────
 
 v_dir() {
@@ -319,6 +367,22 @@ v_port() {
 	if [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; then return 0; fi
 	echo "Port must be a number from 1 to 65535"
 	return 1
+}
+v_user() {
+	if [[ "$1" =~ ^[A-Za-z0-9._-]{3,32}$ ]]; then return 0; fi
+	echo "Username: 3 to 32 letters, numbers and . _ -"
+	return 1
+}
+v_password() {
+	if [ "${#1}" -lt 8 ]; then
+		echo "Password must be at least 8 characters"
+		return 1
+	fi
+	if [[ "$1" =~ [[:cntrl:]] ]]; then
+		echo "Password can't contain control characters"
+		return 1
+	fi
+	return 0
 }
 v_branch() {
 	if [[ "$1" =~ ^[A-Za-z0-9._/-]+$ ]]; then return 0; fi
@@ -358,6 +422,7 @@ run_step() {
 	wait "$BG_PID" || rc=$?
 	BG_PID=""
 
+	STEP_RC=$rc
 	elapsed=$((SECONDS - start))
 	if [ "$rc" -eq 0 ]; then
 		ok "$label$([ "$elapsed" -ge 2 ] && printf '  %s%s%s' "$DIM" "$(fmt_time "$elapsed")" "$RST")"
@@ -1073,6 +1138,44 @@ COMPLETION_EOF
 	fi
 }
 
+json_escape() {
+	local v=$1
+	v=${v//\\/\\\\}
+	v=${v//\"/\\\"}
+	printf '%s' "$v"
+}
+
+# Creates the first admin through the same one-time endpoint the setup screen uses.
+# Writes the outcome (created | exists) to "$LOG.admin".
+create_admin() {
+	local url="http://127.0.0.1:$PORT" status="" code i
+	command -v curl >/dev/null 2>&1 || { echo "curl is required to create the admin login"; return 1; }
+	for ((i = 0; i < 30; i++)); do
+		status="$(curl -s --max-time 3 "$url/api/setup/status" || true)"
+		if grep -Eq '"needsSetup"[[:space:]]*:' <<<"$status"; then break; fi
+		sleep 1
+	done
+	if grep -Eq '"needsSetup"[[:space:]]*:[[:space:]]*false' <<<"$status"; then
+		echo "an admin account already exists; leaving it unchanged"
+		echo exists >"$LOG.admin"
+		return 0
+	fi
+	if ! grep -Eq '"needsSetup"[[:space:]]*:[[:space:]]*true' <<<"$status"; then
+		echo "the dashboard did not answer at $url (got: ${status:-nothing})"
+		return 1
+	fi
+	# The password goes in over stdin, never on the command line.
+	code="$(printf '{"username":"%s","password":"%s"}' "$(json_escape "$ADMIN_USER")" "$(json_escape "$ADMIN_PASS")" |
+		curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST \
+			-H 'Content-Type: application/json' --data-binary @- "$url/api/setup" || true)"
+	if [ "$code" = 201 ]; then
+		echo created >"$LOG.admin"
+		return 0
+	fi
+	echo "setup endpoint answered HTTP ${code:-000}"
+	return 1
+}
+
 wait_healthy() {
 	local i
 	command -v curl >/dev/null 2>&1 || return 0
@@ -1129,7 +1232,7 @@ choose_runtime() {
 }
 
 print_settings() {
-	local mode_label dir_tag="" env_tag="" host_tag="" port_tag=""
+	local mode_label dir_tag="" env_tag="" host_tag="" port_tag="" admin_text="" admin_tag=""
 	case "$MODE" in
 		local) mode_label="Use this checkout"; dir_tag="(this checkout)" ;;
 		update) mode_label="Upgrade existing install" ;;
@@ -1137,6 +1240,16 @@ print_settings() {
 	esac
 	if [ "$ENV_EXISTS" -eq 1 ]; then env_tag="(from existing .env)"; fi
 	host_tag=$env_tag port_tag=$env_tag
+	case "$ADMIN_MODE" in
+		generate) admin_text="$ADMIN_USER  ${DIM}+ generated password${RST}" ;;
+		custom)   admin_text="$ADMIN_USER  ${DIM}+ the password you set${RST}" ;;
+		skip)     admin_text="${DIM}none, use the browser setup screen${RST}" ;;
+	esac
+	if [ "$ADMIN_MODE" != skip ] && [ "$START_SERVICE" -eq 0 ]; then
+		admin_tag="(needs the service started)"
+	elif [ "$ADMIN_MODE" != skip ] && [ "$ENV_EXISTS" -eq 1 ]; then
+		admin_tag="(skipped if one exists)"
+	fi
 	if [ "$ENV_EXISTS" -eq 1 ] && [ "$HOST_SET" -eq 1 ]; then host_tag="(will update .env)"; fi
 	if [ "$ENV_EXISTS" -eq 1 ] && [ "$PORT_SET" -eq 1 ]; then port_tag="(will update .env)"; fi
 	panel "Install settings" \
@@ -1146,7 +1259,33 @@ print_settings() {
 		"$(kv "Public host" "$PUBLIC_HOST" "$host_tag")" \
 		"$(kv "Port" "$PORT" "$port_tag")" \
 		"$(kv "Branch" "$BRANCH")" \
+		"$(kv "Admin login" "$admin_text" "$admin_tag")" \
 		"$(kv "Service" "$([ "$START_SERVICE" -eq 1 ] && echo 'enable and start on boot' || echo 'install only, do not start')")"
+}
+
+edit_admin() {
+	local idx=0
+	case "$ADMIN_MODE" in custom) idx=1 ;; skip) idx=2 ;; esac
+	menu "Admin login" "$idx" \
+		"Generate" "Random password, shown once when the install finishes" \
+		"Choose" "Pick your own username and password" \
+		"Skip" "Create it in the browser instead"
+	case "$MENU_RESULT" in
+		0)
+			ADMIN_MODE=generate
+			ask "Admin username" "$ADMIN_USER" v_user "3 to 32 characters"
+			ADMIN_USER=$REPLY
+			ADMIN_PASS=""
+			;;
+		1)
+			ask "Admin username" "$ADMIN_USER" v_user "3 to 32 characters"
+			ADMIN_USER=$REPLY
+			ask_secret "Admin password (8+ characters)"
+			ADMIN_PASS=$REPLY
+			ADMIN_MODE=custom
+			;;
+		2) ADMIN_MODE=skip; ADMIN_PASS="" ;;
+	esac
 }
 
 edit_port() {
@@ -1166,6 +1305,7 @@ edit_settings() {
 	ask "Branch or tag" "$BRANCH" v_branch "what to install"
 	BRANCH=$REPLY
 	choose_runtime
+	edit_admin
 	menu "Service" "$([ "$START_SERVICE" -eq 1 ] && echo 0 || echo 1)" \
 		"Start" "Enable on boot and start now" \
 		"Install only" "Build everything, start it yourself later"
@@ -1184,14 +1324,16 @@ review_settings() {
 		printf '\n'
 		menu "Ready to install?" 0 \
 			"Install" "Go ahead with these settings" \
+			"Admin login" "Choose the username and password" \
 			"Port" "Change just the port (now $PORT)" \
 			"Customize" "Directory, host, branch, runtime…" \
 			"Cancel" "Exit without changing anything"
 		case "$MENU_RESULT" in
 			0) return 0 ;;
-			1) erase_up $((PANEL_LINES + 1)); edit_port ;;
-			2) erase_up $((PANEL_LINES + 1)); edit_settings ;;
-			3) on_signal ;;
+			1) erase_up $((PANEL_LINES + 1)); edit_admin ;;
+			2) erase_up $((PANEL_LINES + 1)); edit_port ;;
+			3) erase_up $((PANEL_LINES + 1)); edit_settings ;;
+			4) on_signal ;;
 		esac
 	done
 }
@@ -1268,6 +1410,16 @@ install_all() {
 	if [ "$START_SERVICE" -eq 1 ]; then
 		run_step "Starting ServerDash" start_service
 		STEP_SOFT=1 run_step "Waiting for the dashboard to respond" wait_healthy
+		if [ "$ADMIN_MODE" != skip ]; then
+			if [ "$ADMIN_MODE" = generate ]; then ADMIN_PASS="$(gen_password)"; fi
+			rm -f "$LOG.admin"
+			STEP_SOFT=1 run_step "Creating the admin login" create_admin
+			if [ -f "$LOG.admin" ]; then ADMIN_RESULT="$(cat "$LOG.admin")"; else ADMIN_RESULT=failed; fi
+			rm -f "$LOG.admin"
+			if [ "$ADMIN_RESULT" = failed ]; then
+				note "couldn't create it. Open the dashboard and use the setup screen instead"
+			fi
+		fi
 	else
 		warn "Not starting the service ${DIM}(install only)${RST}"
 	fi
@@ -1286,7 +1438,22 @@ summary() {
 	fi
 
 	printf '\n'
-	if [ "$START_SERVICE" -eq 1 ]; then
+	if [ "$START_SERVICE" -eq 1 ] && [ "$ADMIN_RESULT" = created ]; then
+		local pw_row
+		if [ "$ADMIN_MODE" = generate ]; then
+			pw_row="$(kv "Password" "${BOLD}${ADMIN_PASS}${RST}")"
+		else
+			pw_row="$(kv "Password" "${DIM}the one you chose${RST}")"
+		fi
+		panel "$title" \
+			"$(kv "Open" "${AMBER}http://$ip:$PORT${RST}")" \
+			"$(kv "Username" "${BOLD}${ADMIN_USER}${RST}")" \
+			"$pw_row" \
+			"$(kv "Directory" "$INSTALL_DIR")" \
+			"$(kv "Runtime" "$COMPOSE_CMD")" \
+			"$(kv "Manage" "${AMBER}serverdash config${RST}" "(port, host, …)")" \
+			"$(kv "Data" "serverdash-data volume, kept on upgrade")"
+	elif [ "$START_SERVICE" -eq 1 ]; then
 		panel "$title" \
 			"$(kv "Open" "${AMBER}http://$ip:$PORT${RST}")" \
 			"$(kv "Directory" "$INSTALL_DIR")" \
@@ -1301,9 +1468,19 @@ summary() {
 			"$(kv "Data" "serverdash-data volume, kept on upgrade")"
 	fi
 
+	if [ "$ADMIN_RESULT" = created ] && [ "$ADMIN_MODE" = generate ]; then
+		printf '\n  %s%s%s Save that password now. It is not stored anywhere else.\n' "$YELLOW" "$G_WARN" "$RST"
+		note "change it later under Admin → Users in the dashboard"
+	fi
 	if [ "$START_SERVICE" -eq 1 ] && [ "$MODE" != update ]; then
 		printf '\n  %sNext%s\n' "$BOLD" "$RST"
-		printf '    %s1.%s Open the URL above and create the admin account\n' "$AMBER" "$RST"
+		if [ "$ADMIN_RESULT" = created ]; then
+			printf '    %s1.%s Open the URL above and sign in as %s\n' "$AMBER" "$RST" "$ADMIN_USER"
+		elif [ "$ADMIN_RESULT" = exists ]; then
+			printf '    %s1.%s Open the URL above and sign in with your existing admin login\n' "$AMBER" "$RST"
+		else
+			printf '    %s1.%s Open the URL above and create the admin account\n' "$AMBER" "$RST"
+		fi
 		printf '    %s2.%s Put a reverse proxy in front of it for https://%s\n' "$AMBER" "$RST" "$PUBLIC_HOST"
 	fi
 
@@ -1325,6 +1502,9 @@ parse_args() {
 			--public-host) [ $# -ge 2 ] || die "--public-host needs a value"; PUBLIC_HOST=$2; HOST_SET=1; shift 2 ;;
 			--port)        [ $# -ge 2 ] || die "--port needs a value"; PORT=$2; PORT_SET=1; shift 2 ;;
 			--branch)      [ $# -ge 2 ] || die "--branch needs a value"; BRANCH=$2; shift 2 ;;
+			--admin-user)  [ $# -ge 2 ] || die "--admin-user needs a value"; ADMIN_USER=$2; shift 2 ;;
+			--admin-password) [ $# -ge 2 ] || die "--admin-password needs a value"; ADMIN_PASS=$2; ADMIN_MODE=custom; shift 2 ;;
+			--no-admin)    ADMIN_MODE=skip; shift ;;
 			--no-start)    START_SERVICE=0; shift ;;
 			-y|--yes)      ASSUME_YES=1; shift ;;
 			-h|--help)     usage; exit 0 ;;
@@ -1341,6 +1521,8 @@ parse_args() {
 	err="$(v_host "$PUBLIC_HOST")" || die "--public-host: $err"
 	err="$(v_port "$PORT")" || die "--port: $err"
 	err="$(v_branch "$BRANCH")" || die "--branch: $err"
+	err="$(v_user "$ADMIN_USER")" || die "--admin-user: $err"
+	if [ "$ADMIN_MODE" = custom ]; then err="$(v_password "$ADMIN_PASS")" || die "--admin-password: $err"; fi
 }
 
 main() {
