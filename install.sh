@@ -39,6 +39,7 @@ BRANCH="main"
 START_SERVICE=1
 ASSUME_YES=0
 PORT_SET=0
+UNINSTALL_ARGS=()
 HOST_SET=0
 ADMIN_MODE=generate              # generate | custom | skip
 ADMIN_USER="admin"
@@ -102,6 +103,8 @@ Options:
   --web-setup               Install with defaults, then finish setup in your browser
                             (admin account, branding, and cluster role). A one-time
                             setup code is shown so nobody else can claim the server.
+  --uninstall               Remove ServerDash: service, containers, CLI, install
+                            directory and data. Add --keep-data to keep the data.
   --no-start                Install and build, but don't enable/start the service
   -y, --yes                 Don't prompt; use the flags and defaults as given
   -h, --help                Show this help
@@ -644,6 +647,10 @@ install_cli() {
 		printf 'SERVERDASH_DIR=%q\n' "$INSTALL_DIR"
 		printf 'COMPOSE_CMD=%q\n' "$COMPOSE_CMD"
 		printf 'RUNTIME=%q\n' "$RUNTIME"
+		printf 'UNIT_DIR=%q\n' "$UNIT_DIR"
+		printf 'NATIVE_DATA_DIR=%q\n' "$NATIVE_DATA_DIR"
+		printf 'BIN_DIR=%q\n' "$bin_dir"
+		printf 'CONF_DIR=%q\n' "$conf_dir"
 	} >"$conf_dir/install.conf"
 
 	cat >"$bin_dir/serverdash" <<'SERVERDASH_CLI_EOF'
@@ -1167,6 +1174,70 @@ cmd_setup_code() {
 	printf '\n'
 }
 
+# cmd_uninstall: remove the service, containers, CLI and install directory.
+# Data (users, settings, workflows) is deleted too unless --keep-data is given.
+cmd_uninstall() {
+	need_root
+	local keep=0 yes=0 a reply
+	for a in "$@"; do
+		case "$a" in
+			--keep-data) keep=1 ;;
+			-y|--yes) yes=1 ;;
+			*) die "unknown option for uninstall: $a (use --keep-data, --yes)" ;;
+		esac
+	done
+	local unit_dir="${UNIT_DIR:-/etc/systemd/system}" data_dir="${NATIVE_DATA_DIR:-/var/lib/serverdash}"
+	local bin_dir="${BIN_DIR:-/usr/local/bin}" conf_dir="${CONF_DIR:-/etc/serverdash}"
+	local data_text
+	if [ "$keep" -eq 1 ]; then
+		data_text="${GREEN}kept${RST}  reinstalling to $SERVERDASH_DIR picks it up again"
+	else
+		data_text="${RED}deleted${RST}  users, settings, workflows, scripts, cluster membership"
+	fi
+	printf '\n'
+	panel "Uninstall ServerDash" \
+		"$(kv "Directory" "$SERVERDASH_DIR")" \
+		"$(kv "Runtime" "${RUNTIME:-docker}")" \
+		"$(kv "Data" "$data_text")"
+	printf '\n'
+	if [ "$yes" -eq 0 ]; then
+		[ -r /dev/tty ] || die "no terminal to confirm on; re-run with --yes"
+		printf '  Type %suninstall%s to confirm: ' "$BOLD" "$RST"
+		read -r reply </dev/tty || reply=""
+		[ "$reply" = uninstall ] || die "cancelled, nothing was changed"
+		printf '\n'
+	fi
+	cd /
+
+	step "Stopping the service" bash -c "systemctl disable --now $SERVICE 2>/dev/null; true"
+	if [ "${RUNTIME:-}" != native ] && [ -f "$SERVERDASH_DIR/docker-compose.yml" ]; then
+		local down="down --remove-orphans --rmi local"
+		if [ "$keep" -eq 0 ]; then down="$down -v"; fi
+		# shellcheck disable=SC2086
+		step "Removing containers" bash -c "cd '$SERVERDASH_DIR' && $COMPOSE_CMD $down"
+	fi
+	if [ "$keep" -eq 1 ] && [ -f "$ENV_FILE" ]; then
+		mkdir -p "$data_dir"
+		cp "$ENV_FILE" "$data_dir/serverdash.env.bak"
+		note "saved your settings to $data_dir/serverdash.env.bak"
+	elif [ "$keep" -eq 0 ] && [ -d "$data_dir" ]; then
+		step "Deleting data in $data_dir" rm -rf "$data_dir"
+	fi
+	rm -f "$unit_dir/$SERVICE.service"
+	systemctl daemon-reload 2>/dev/null || true
+	step "Removing $SERVERDASH_DIR" rm -rf "$SERVERDASH_DIR"
+	rm -f /etc/bash_completion.d/serverdash
+	rm -rf "$conf_dir"
+	rm -f "$bin_dir/serverdash"
+	printf '\n'
+	ok "ServerDash is uninstalled"
+	if [ "${RUNTIME:-}" = native ]; then
+		note "the build toolchain in /usr/local/lib/serverdash-toolchain was left in place, if there is one"
+	fi
+	note "if your shell was inside $SERVERDASH_DIR, run: cd ~"
+	printf '\n'
+}
+
 cmd_version() {
 	git -C "$SERVERDASH_DIR" log -1 --format='serverdash %h (%cs)' 2>/dev/null || echo "serverdash (unknown version)"
 }
@@ -1191,6 +1262,7 @@ cmd_help() {
     serverdash update               pull the latest code and rebuild
     serverdash version
     serverdash setup-code           show the browser setup code
+    serverdash uninstall            remove ServerDash and its data  (--keep-data, --yes)
 
   KEY can be short: ${DIM}port${RST}, ${DIM}public-host${RST}, or a full name like ${DIM}SERVERDASH_KUBECONFIG${RST}.
 
@@ -1211,6 +1283,7 @@ main() {
 		update|upgrade) cmd_update ;;
 		version|--version|-v) cmd_version ;;
 		setup-code) cmd_setup_code ;;
+		uninstall) cmd_uninstall "$@" ;;
 		""|help|-h|--help) cmd_help ;;
 		*) die "unknown command '$cmd'. Try: serverdash help" ;;
 	esac
@@ -1225,7 +1298,7 @@ SERVERDASH_CLI_EOF
 _serverdash() {
 	local cur=${COMP_WORDS[COMP_CWORD]}
 	if [ "$COMP_CWORD" -eq 1 ]; then
-		COMPREPLY=($(compgen -W "config port status start stop restart logs update version help" -- "$cur"))
+		COMPREPLY=($(compgen -W "config port status start stop restart logs update version setup-code uninstall help" -- "$cur"))
 	elif [ "${COMP_WORDS[1]}" = config ] && [ "$COMP_CWORD" -eq 2 ]; then
 		COMPREPLY=($(compgen -W "list get set edit" -- "$cur"))
 	fi
@@ -1712,8 +1785,10 @@ parse_args() {
 			--admin-password) [ $# -ge 2 ] || die "--admin-password needs a value"; ADMIN_PASS=$2; ADMIN_MODE=custom; shift 2 ;;
 			--no-admin)    ADMIN_MODE=skip; shift ;;
 			--web-setup)   WEB_SETUP_FLAG=1; shift ;;
+			--uninstall)   UNINSTALL_FLAG=1; shift ;;
+			--keep-data)   UNINSTALL_ARGS+=(--keep-data); shift ;;
 			--no-start)    START_SERVICE=0; shift ;;
-			-y|--yes)      ASSUME_YES=1; shift ;;
+			-y|--yes)      ASSUME_YES=1; UNINSTALL_ARGS+=(--yes); shift ;;
 			-h|--help)     usage; exit 0 ;;
 			*)             die "unknown option: $1 (see --help)" ;;
 		esac
@@ -1739,6 +1814,12 @@ main() {
 	ORIG_ARGS=("$@")
 	T0=$SECONDS
 	parse_args "$@"
+	if [ "${UNINSTALL_FLAG:-0}" -eq 1 ]; then
+		[ "$(id -u)" -eq 0 ] || die "must be run as root to uninstall. Try: sudo ./install.sh --uninstall"
+		command -v serverdash >/dev/null 2>&1 || [ -x /usr/local/bin/serverdash ] \
+			|| die "ServerDash doesn't look installed here (no serverdash command found)"
+		exec "$(command -v serverdash || echo /usr/local/bin/serverdash)" uninstall ${UNINSTALL_ARGS[@]+"${UNINSTALL_ARGS[@]}"}
+	fi
 	if [ "${WEB_SETUP_FLAG:-0}" -eq 1 ]; then enable_web_setup; fi
 	init_ui
 	banner
