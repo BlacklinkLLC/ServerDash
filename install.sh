@@ -1499,6 +1499,16 @@ review_settings() {
 
 preflight() {
 	local os arch
+	case "$(uname -s)" in
+		Linux) ;;
+		Darwin)
+			die "ServerDash runs on Linux servers, not macOS.
+    It monitors and manages the Linux host it is installed on (systemd services, the
+    journal, host disks and processes), and none of those exist on a Mac. Under Docker
+    Desktop it would only see Docker's hidden Linux VM, not your Mac.
+    Install it on your Linux server instead, then open http://<server-ip>:<port> from this Mac." ;;
+		*) die "ServerDash needs a Linux server with systemd (this system is $(uname -s))" ;;
+	esac
 	if [ "$(id -u)" -ne 0 ]; then
 		if [ -n "$SCRIPT_PATH" ] && command -v sudo >/dev/null 2>&1; then
 			warn "Root is required, re-running with sudo…"
