@@ -45,11 +45,40 @@ The script installs Docker if it's missing (or Podman, with `--runtime podman`),
 
 It's safe to re-run, which also upgrades an existing install. Run `install.sh --help` for the full list of options: `--dir`, `--public-host`, `--port`, `--branch`, and `--no-start`.
 
+### Without Docker (native install)
+
+ServerDash can also run directly on the host, with no container runtime:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/BlacklinkLLC/ServerDash/main/install.sh | sudo bash -s -- --runtime native
+```
+
+The interactive installer offers the same choice under "How should ServerDash run?". A native install:
+
+- builds ServerDash from source with `scripts/build-native.sh`. It uses the system's Go and Node if they're new enough (Go 1.21+, Node 20.19+/22.12+), and otherwise downloads official toolchains into `/usr/local/lib/serverdash-toolchain`, used only for building
+- runs as one process: the Go binary (`bin/serverdash`) serves both the API and the dashboard, so Node isn't needed at runtime
+- runs as the `serverdash` systemd service, reading settings from the same `.env` file and storing data in `/var/lib/serverdash`
+- turns on **Tools → Services** (start, stop, restart, enable, or disable systemd services and read their logs) and **Tools → System logs** (search and filter the system journal)
+
+Containers still work if Docker or Podman is installed. Without either, the container sections are simply hidden. `serverdash logs` follows the journal and `serverdash update` rebuilds and restarts. Re-running the installer on an existing native install keeps it native, and switching an existing container install to `--runtime native` stops the old container first; the `serverdash-data` volume isn't migrated automatically.
+
+To run it by hand without the installer:
+
+```sh
+scripts/build-native.sh
+SERVERDASH_WEB_DIR=$PWD/web/dist SERVERDASH_PORT=9900 SERVERDASH_DB_PATH=/var/lib/serverdash/serverdash.db sudo -E bin/serverdash
+```
+
 ## Features
 
 **Monitoring**
-- Server overview: hostname, platform, uptime, and load average
-- CPU, memory, and per-disk usage with usage bars
+- Server overview: health banner, resource gauges, and an hour of CPU, memory, and network history
+- Per-core CPU, swap, storage volumes, container summary, and top processes
+
+**Server tools**
+- Process manager: search, sort, and stop or kill processes (admin)
+- Listening ports and network interfaces
+- systemd services and the system journal (native installs)
 
 **Containers and pods**
 - Docker and Podman: list containers, start/stop/restart, live log streaming, and an admin-only [web terminal](#web-terminal)

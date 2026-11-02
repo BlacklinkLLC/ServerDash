@@ -55,6 +55,14 @@ export const api = {
 	signalProcess: (pid, signal) => post(`/api/system/processes/${pid}/signal`, { signal }),
 	ports: () => request('/api/system/ports'),
 	interfaces: () => request('/api/system/interfaces'),
+	host: () => request('/api/host'),
+	services: () => request('/api/services'),
+	serviceAction: (name, action) => post(`/api/services/${encodeURIComponent(name)}/${action}`),
+	journal: (opts = {}) => {
+		const params = new URLSearchParams();
+		for (const [k, v] of Object.entries(opts)) if (v !== undefined && v !== '' && v !== null) params.set(k, v);
+		return request(`/api/journal?${params}`);
+	},
 
 	// --- Containers (Docker/Podman) ---
 	containers: () => request('/api/containers'),

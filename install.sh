@@ -2,7 +2,9 @@
 # ServerDash installer
 #
 # Installs Docker or Podman if missing, fetches ServerDash, and runs it as a
-# systemd-managed `docker compose` (or `podman compose`) service.
+# systemd-managed `docker compose` (or `podman compose`) service. Or, with
+# `--runtime native`, builds it from source and runs it directly on the host
+# as a single binary, with no container runtime needed at all.
 #
 # Run it interactively and it walks you through the setup:
 #   curl -fsSL https://raw.githubusercontent.com/BlacklinkLLC/ServerDash/main/install.sh | sudo bash
@@ -79,7 +81,11 @@ Usage:
   sudo ./install.sh [options]
 
 Options:
-  --runtime docker|podman   Container runtime to install/use (default: docker)
+  --runtime docker|podman|native
+                            How to run ServerDash (default: docker). native
+                            builds it from source and runs it directly under
+                            systemd, without any container runtime; it also
+                            enables the Services and System logs tools.
   --dir PATH                Install directory (default: /opt/serverdash)
   --public-host HOST        Value for SERVERDASH_PUBLIC_HOST (default: nova.blacklink.net)
   --port PORT               Host port to publish the dashboard on (default: 9900).
@@ -479,6 +485,28 @@ install_podman_compose() {
 
 enable_podman_socket() { systemctl enable --now podman.socket; }
 
+NATIVE_DATA_DIR="${SERVERDASH_NATIVE_DATA_DIR:-/var/lib/serverdash}"
+
+install_git() {
+	export DEBIAN_FRONTEND=noninteractive
+	if command -v dnf >/dev/null 2>&1; then dnf install -y git curl tar xz
+	elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y git curl tar xz-utils
+	elif command -v pacman >/dev/null 2>&1; then pacman -Sy --noconfirm git curl tar xz
+	elif command -v zypper >/dev/null 2>&1; then zypper install -y git curl tar xz
+	elif command -v apk >/dev/null 2>&1; then apk add --no-cache git curl tar xz bash
+	else die "no supported package manager found; install git, curl, tar and xz manually and re-run"
+	fi
+}
+
+stop_container_install() { # stop_container_install COMPOSE_CMD
+	systemctl stop serverdash 2>/dev/null || true
+	cd "$INSTALL_DIR" && $1 down
+}
+
+build_native() {
+	bash "$INSTALL_DIR/scripts/build-native.sh" "$INSTALL_DIR"
+}
+
 fetch_source() {
 	case "$MODE" in
 		local)
@@ -534,12 +562,46 @@ configure_env() {
 }
 
 build_image() {
+	if [ "$RUNTIME" = native ]; then build_native; return; fi
 	cd "$INSTALL_DIR"
 	export BUILDKIT_PROGRESS=plain COMPOSE_PROGRESS=plain
 	$COMPOSE_CMD build
 }
 
+write_native_unit() {
+	mkdir -p "$NATIVE_DATA_DIR"
+	chmod 700 "$NATIVE_DATA_DIR"
+	cat >"$UNIT_DIR/serverdash.service" <<EOF
+[Unit]
+Description=ServerDash
+Documentation=https://github.com/BlacklinkLLC/ServerDash
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=$INSTALL_DIR
+# .env holds SERVERDASH_PORT / SERVERDASH_PUBLIC_HOST and any overrides,
+# the same file the container install uses.
+EnvironmentFile=-$INSTALL_DIR/.env
+Environment=SERVERDASH_WEB_DIR=$INSTALL_DIR/web/dist
+Environment=SERVERDASH_DB_PATH=$NATIVE_DATA_DIR/serverdash.db
+Environment=SERVERDASH_INSTALL_DIR=$INSTALL_DIR
+Environment="SERVERDASH_UPDATE_CMD=/usr/local/bin/serverdash update"
+ExecStart=$INSTALL_DIR/bin/serverdash
+Restart=on-failure
+RestartSec=3
+# Runs as root: it manages host services, processes and (if present) the
+# Docker/Podman socket, with the same reach the container install has.
+
+[Install]
+WantedBy=multi-user.target
+EOF
+	systemctl daemon-reload
+}
+
 write_unit() {
+	if [ "$RUNTIME" = native ]; then write_native_unit; return; fi
 	cat >"$UNIT_DIR/serverdash.service" <<EOF
 [Unit]
 Description=ServerDash
@@ -1043,7 +1105,7 @@ cmd_status() {
 		"$(kv "Status" "$state")" \
 		"$(kv "Local URL" "http://$(host_ip):${port:-9900}")" \
 		"$(kv "Directory" "$SERVERDASH_DIR")" \
-		"$(kv "Runtime" "$COMPOSE_CMD")" \
+		"$(kv "Runtime" "$(if [ "${RUNTIME:-}" = native ]; then echo "native (systemd)"; else echo "$COMPOSE_CMD"; fi)")" \
 		"$(kv "Version" "$version")"
 	printf '\n'
 }
@@ -1054,6 +1116,10 @@ cmd_restart() { need_root; step "Restarting ServerDash" systemctl restart "$SERV
 
 cmd_logs() {
 	need_root
+	if [ "${RUNTIME:-}" = native ]; then
+		if [ $# -eq 0 ]; then set -- -f -n 100; fi
+		exec journalctl -u "$SERVICE" "$@"
+	fi
 	cd "$SERVERDASH_DIR"
 	if [ $# -eq 0 ]; then set -- -f --tail 100; fi
 	# shellcheck disable=SC2086
@@ -1061,7 +1127,13 @@ cmd_logs() {
 }
 
 do_pull()  { git -C "$SERVERDASH_DIR" pull --ff-only; }
-do_build() { cd "$SERVERDASH_DIR" && BUILDKIT_PROGRESS=plain $COMPOSE_CMD up -d --build; }
+do_build() {
+	if [ "${RUNTIME:-}" = native ]; then
+		bash "$SERVERDASH_DIR/scripts/build-native.sh" "$SERVERDASH_DIR" && systemctl restart "$SERVICE"
+		return
+	fi
+	cd "$SERVERDASH_DIR" && BUILDKIT_PROGRESS=plain $COMPOSE_CMD up -d --build
+}
 
 cmd_update() {
 	need_root
@@ -1210,9 +1282,22 @@ resolve_source() {
 	fi
 }
 
+# previous_install VAR: prints a value from an existing install's
+# install.conf (written by install_cli), or nothing on a fresh host.
+previous_install() {
+	local conf="${SERVERDASH_CONF_DIR:-/etc/serverdash}/install.conf"
+	[ -r "$conf" ] || return 0
+	sed -n "s/^$1=//p" "$conf" | tail -n 1 | tr -d "'\""
+}
+
 default_runtime() {
 	if [ "$RUNTIME_FLAG" -eq 1 ]; then return 0; fi
-	if docker_ready; then
+	local prev
+	prev="$(previous_install RUNTIME)"
+	# An upgrade keeps whatever the existing install runs on.
+	if [ -n "$prev" ]; then
+		RUNTIME=$prev
+	elif docker_ready; then
 		RUNTIME=docker
 	elif podman_ready; then
 		RUNTIME=podman
@@ -1226,10 +1311,16 @@ choose_runtime() {
 	if docker_ready; then d_tag="$G_DOT installed"; fi
 	if podman_ready; then p_tag="$G_DOT installed"; fi
 	if [ "$RUNTIME" = podman ]; then idx=1; fi
-	menu "Container runtime" "$idx" \
-		"Docker" "Official install script ${d_tag:+· $d_tag}" \
-		"Podman" "Daemonless, from your package manager ${p_tag:+· $p_tag}"
-	if [ "$MENU_RESULT" -eq 0 ]; then RUNTIME=docker; else RUNTIME=podman; fi
+	if [ "$RUNTIME" = native ]; then idx=2; fi
+	menu "How should ServerDash run?" "$idx" \
+		"Docker" "In a container, official install script ${d_tag:+· $d_tag}" \
+		"Podman" "In a container, daemonless ${p_tag:+· $p_tag}" \
+		"Native" "Directly on this host, no containers needed"
+	case "$MENU_RESULT" in
+		0) RUNTIME=docker ;;
+		1) RUNTIME=podman ;;
+		*) RUNTIME=native ;;
+	esac
 }
 
 print_settings() {
@@ -1366,7 +1457,24 @@ preflight() {
 install_all() {
 	section "Installing"
 
-	if [ "$RUNTIME" = docker ]; then
+	if [ "$RUNTIME" = native ]; then
+		if command -v git >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then
+			ok "git, curl and xz ready"
+		else
+			run_step "Installing git, curl and xz" install_git
+		fi
+		COMPOSE_CMD="native"
+		local prev_compose
+		prev_compose="$(previous_install COMPOSE_CMD)"
+		if [ -n "$prev_compose" ] && [ "$prev_compose" != native ] && [ -f "$INSTALL_DIR/docker-compose.yml" ]; then
+			# Switching from the container install: free the port first.
+			# The serverdash-data volume is left alone.
+			STEP_SOFT=1 run_step "Stopping the old ServerDash container" stop_container_install "$prev_compose"
+		fi
+		if docker_ready || podman_ready; then
+			note "a container runtime is installed too; ServerDash will still manage its containers"
+		fi
+	elif [ "$RUNTIME" = docker ]; then
 		if docker_ready; then
 			ok "Docker ready  ${DIM}$(docker --version | cut -d, -f1)${RST}"
 		else
@@ -1404,7 +1512,11 @@ install_all() {
 	PUBLIC_FROM_ENV="$(sed -n 's/^SERVERDASH_PUBLIC_HOST=//p' "$INSTALL_DIR/.env" | tail -n 1 | tr -d '"\r' || true)"
 	if [ -n "$PUBLIC_FROM_ENV" ]; then PUBLIC_HOST=$PUBLIC_FROM_ENV; fi
 
-	run_step "Building the image (a few minutes the first time)" build_image
+	if [ "$RUNTIME" = native ]; then
+		run_step "Building ServerDash (a few minutes the first time)" build_image
+	else
+		run_step "Building the image (a few minutes the first time)" build_image
+	fi
 	run_step "Installing the systemd service" write_unit
 	run_step "Installing the serverdash command" install_cli
 
@@ -1432,6 +1544,13 @@ summary() {
 	if [ -z "$ip" ]; then ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"; fi
 	if [ -z "$ip" ]; then ip="<this-host>"; fi
 	took="$(fmt_time $((SECONDS - T0)))"
+	if [ "$RUNTIME" = native ]; then
+		RUNTIME_LABEL="native (systemd)"
+		DATA_LABEL="$NATIVE_DATA_DIR, kept on upgrade"
+	else
+		RUNTIME_LABEL="$COMPOSE_CMD"
+		DATA_LABEL="serverdash-data volume, kept on upgrade"
+	fi
 
 	if [ "$START_SERVICE" -eq 1 ]; then
 		case "$MODE" in update) title="ServerDash upgraded" ;; *) title="ServerDash is running" ;; esac
@@ -1452,22 +1571,22 @@ summary() {
 			"$(kv "Username" "${BOLD}${ADMIN_USER}${RST}")" \
 			"$pw_row" \
 			"$(kv "Directory" "$INSTALL_DIR")" \
-			"$(kv "Runtime" "$COMPOSE_CMD")" \
+			"$(kv "Runtime" "$RUNTIME_LABEL")" \
 			"$(kv "Manage" "${AMBER}serverdash config${RST}" "(port, host, …)")" \
-			"$(kv "Data" "serverdash-data volume, kept on upgrade")"
+			"$(kv "Data" "$DATA_LABEL")"
 	elif [ "$START_SERVICE" -eq 1 ]; then
 		panel "$title" \
 			"$(kv "Open" "${AMBER}http://$ip:$PORT${RST}")" \
 			"$(kv "Directory" "$INSTALL_DIR")" \
-			"$(kv "Runtime" "$COMPOSE_CMD")" \
+			"$(kv "Runtime" "$RUNTIME_LABEL")" \
 			"$(kv "Manage" "${AMBER}serverdash config${RST}" "(port, host, …)")" \
-			"$(kv "Data" "serverdash-data volume, kept on upgrade")"
+			"$(kv "Data" "$DATA_LABEL")"
 	else
 		panel "$title" \
 			"$(kv "Start it" "${AMBER}systemctl start serverdash${RST}")" \
 			"$(kv "Directory" "$INSTALL_DIR")" \
-			"$(kv "Runtime" "$COMPOSE_CMD")" \
-			"$(kv "Data" "serverdash-data volume, kept on upgrade")"
+			"$(kv "Runtime" "$RUNTIME_LABEL")" \
+			"$(kv "Data" "$DATA_LABEL")"
 	fi
 
 	if [ "$ADMIN_RESULT" = created ] && [ "$ADMIN_MODE" = generate ]; then
@@ -1515,8 +1634,8 @@ parse_args() {
 	done
 
 	case "$RUNTIME" in
-		""|docker|podman) ;;
-		*) die "--runtime must be 'docker' or 'podman', got '$RUNTIME'" ;;
+		""|docker|podman|native) ;;
+		*) die "--runtime must be 'docker', 'podman' or 'native', got '$RUNTIME'" ;;
 	esac
 	local err
 	err="$(v_dir "$INSTALL_DIR")" || die "--dir: $err"

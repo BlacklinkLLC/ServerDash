@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/docker/docker/client"
 	"github.com/gorilla/websocket"
 )
 
@@ -11,6 +12,13 @@ const nicknameRuntimeContainer = "container"
 func (s *Server) handleListContainers(w http.ResponseWriter, r *http.Request) {
 	list, err := s.docker.List(r.Context())
 	if err != nil {
+		if client.IsErrConnectionFailed(err) {
+			// No Docker/Podman on this host (common for native installs):
+			// report an empty list rather than failing the whole dashboard.
+			w.Header().Set("X-Runtime-Unavailable", "true")
+			writeJSON(w, http.StatusOK, []any{})
+			return
+		}
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}

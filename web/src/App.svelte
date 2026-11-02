@@ -30,6 +30,7 @@
 	let containers = $state([]);
 	let metricsHistory = $state([]);
 	let topProcesses = $state(null);
+	let host = $state(null);
 	let error = $state(null);
 
 	async function loadBranding() {
@@ -114,6 +115,11 @@
 	$effect(() => {
 		if (authState === 'ready') {
 			page;
+			if (!host) {
+				api.host()
+					.then((h) => (host = h))
+					.catch(() => {});
+			}
 			refresh();
 			timer = setInterval(refresh, (branding.refreshSeconds || 5) * 1000);
 			return () => clearInterval(timer);
@@ -169,15 +175,15 @@
 					history={metricsHistory}
 					{containers}
 					processes={topProcesses}
-					settings={branding}
+					settings={host?.containersRuntime === false ? { ...branding, widgets: (branding.widgets ?? []).filter((w) => w !== 'containers') } : branding}
 					onnavigate={(p) => (page = p)}
 				/>
 			{/if}
-			{#if branding.showContainers}
+			{#if branding.showContainers && host?.containersRuntime !== false}
 				<ContainerList {containers} {canOperate} {isAdmin} onaction={refresh} />
 			{/if}
 		{:else if page === 'tools'}
-			<ToolsView {isAdmin} refreshSeconds={branding.refreshSeconds || 5} />
+			<ToolsView {isAdmin} {host} refreshSeconds={branding.refreshSeconds || 5} />
 		{:else if page === 'kubernetes'}
 			<KubernetesView {canOperate} />
 		{:else if page === 'admin'}

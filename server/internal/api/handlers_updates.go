@@ -11,7 +11,7 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleApplyUpdate(w http.ResponseWriter, r *http.Request) {
-	if err := selfupdate.Apply(r.Context(), s.cfg.InstallDir, s.cfg.ComposeCmd); err != nil {
+	if err := selfupdate.Apply(r.Context(), s.cfg.InstallDir, s.cfg.ComposeCmd, s.cfg.UpdateCmd); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}

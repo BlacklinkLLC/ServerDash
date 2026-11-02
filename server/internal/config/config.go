@@ -40,12 +40,18 @@ type Config struct {
 	// rather than erroring, since most Kubernetes/other-install-method
 	// deployments won't have this.
 	InstallDir string
+	// WebDir, when set, is the built dashboard (web/dist) the Go server
+	// serves itself — the native install's single-process mode.
+	WebDir string
+	// UpdateCmd is what self-update hands the rebuild to on a native
+	// install (run via systemd-run so it outlives this process).
+	UpdateCmd []string
 }
 
 func Load() Config {
 	dbPath := getEnv("SERVERDASH_DB_PATH", "./serverdash.db")
 	return Config{
-		ListenAddr: getEnv("SERVERDASH_LISTEN_ADDR", ":8080"),
+		ListenAddr: listenAddr(),
 		DockerHost: resolveDockerHost(),
 		PublicHost: getEnv("SERVERDASH_PUBLIC_HOST", "nova.blacklink.net"),
 		HostRoot:   getEnv("SERVERDASH_HOST_ROOT", ""),
@@ -54,6 +60,8 @@ func Load() Config {
 		DataDir:    getEnv("SERVERDASH_DATA_DIR", filepath.Dir(dbPath)),
 		ComposeCmd: strings.Fields(getEnv("SERVERDASH_COMPOSE_CMD", "docker compose")),
 		InstallDir: getEnv("SERVERDASH_INSTALL_DIR", ""),
+		WebDir:     getEnv("SERVERDASH_WEB_DIR", ""),
+		UpdateCmd:  strings.Fields(getEnv("SERVERDASH_UPDATE_CMD", "")),
 	}
 }
 
@@ -78,6 +86,19 @@ func resolveDockerHost() string {
 		}
 	}
 	return "unix:///var/run/docker.sock"
+}
+
+// listenAddr prefers an explicit SERVERDASH_LISTEN_ADDR. A native install
+// serves the UI from this process, so it listens on SERVERDASH_PORT (the
+// same .env key docker-compose publishes) when that's all that's set.
+func listenAddr() string {
+	if v := os.Getenv("SERVERDASH_LISTEN_ADDR"); v != "" {
+		return v
+	}
+	if os.Getenv("SERVERDASH_WEB_DIR") != "" {
+		return ":" + getEnv("SERVERDASH_PORT", "9900")
+	}
+	return ":8080"
 }
 
 func getEnv(key, fallback string) string {

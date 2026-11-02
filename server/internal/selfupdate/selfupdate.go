@@ -120,7 +120,12 @@ func CheckStatus(ctx context.Context, dir string) Status {
 // It returns once the pull has succeeded and the rebuild has been handed
 // off — not once the rebuild itself finishes, since by then this process
 // may no longer exist to report back.
-func Apply(ctx context.Context, dir string, composeCmd []string) error {
+//
+// nativeCmd, when non-empty, is a native install's rebuild command; it's
+// launched as a transient systemd unit instead of a sibling container,
+// for the same reason: it restarts serverdash.service, which would
+// otherwise kill it as a child of this process.
+func Apply(ctx context.Context, dir string, composeCmd, nativeCmd []string) error {
 	if dir == "" {
 		return fmt.Errorf("self-update isn't configured (SERVERDASH_INSTALL_DIR is unset)")
 	}
@@ -131,6 +136,10 @@ func Apply(ctx context.Context, dir string, composeCmd []string) error {
 	}
 	if _, err := runGit(ctx, dir, "pull", "--ff-only", "origin", branch); err != nil {
 		return fmt.Errorf("git pull: %w", err)
+	}
+
+	if len(nativeCmd) > 0 {
+		return launchNative(nativeCmd)
 	}
 
 	image, err := ownImage(ctx)
@@ -184,4 +193,18 @@ func ownImage(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("empty image reference")
 	}
 	return image, nil
+}
+
+func launchNative(cmdline []string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	args := append([]string{"--unit", "serverdash-update-" + strconv.FormatInt(time.Now().Unix(), 10), "--collect", "--"}, cmdline...)
+	cmd := exec.CommandContext(ctx, "systemd-run", args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("launch rebuild: %w: %s", err, strings.TrimSpace(out.String()))
+	}
+	return nil
 }

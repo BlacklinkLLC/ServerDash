@@ -82,6 +82,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/system", s.handleSystem)
 	mux.HandleFunc("GET /api/runtime", s.handleRuntimeInfo)
 	mux.HandleFunc("GET /api/system/history", s.handleSystemHistory)
+	mux.HandleFunc("GET /api/host", s.handleHostInfo)
+	// --- Host services / journal (native installs with systemd) ---
+	mux.HandleFunc("GET /api/services", auth.RequireRole(s.handleListServices, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("POST /api/services/{name}/{action}", auth.RequireRole(s.handleServiceAction, store.RoleAdmin))
+	mux.HandleFunc("GET /api/journal", auth.RequireRole(s.handleJournal, store.RoleAdmin, store.RoleOperator))
 	mux.HandleFunc("GET /api/system/interfaces", s.handleInterfaces)
 	// Process command lines and socket owners can leak secrets (tokens in
 	// argv), so these tools are limited to operators and admins; sending
@@ -143,7 +148,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/updates/apply", auth.RequireRole(s.handleApplyUpdate, store.RoleAdmin))
 
 	authMW := &auth.Middleware{Store: s.store, PublicPaths: publicPaths}
-	return withCORS(s.cfg.PublicHost, withLogging(authMW.Wrap(mux)))
+	return withLogging(withStatic(s.cfg.WebDir, withCORS(s.cfg.PublicHost, authMW.Wrap(mux))))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

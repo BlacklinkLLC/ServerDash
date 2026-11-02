@@ -3,8 +3,10 @@
 	import { api } from './api.js';
 	import { formatBytes } from './format.js';
 	import Icon from './Icon.svelte';
+	import ServicesPanel from './tools/ServicesPanel.svelte';
+	import JournalViewer from './tools/JournalViewer.svelte';
 
-	let { isAdmin, refreshSeconds = 5 } = $props();
+	let { isAdmin, refreshSeconds = 5, host = null } = $props();
 
 	let tab = $state('processes');
 	let error = $state(null);
@@ -86,6 +88,8 @@
 		<button class:active={tab === 'processes'} onclick={() => (tab = 'processes')}><Icon name="Script" size={14} /> Processes</button>
 		<button class:active={tab === 'ports'} onclick={() => (tab = 'ports')}><Icon name="Connect" size={14} /> Listening ports</button>
 		<button class:active={tab === 'network'} onclick={() => (tab = 'network')}><Icon name="Ethernet" size={14} /> Network interfaces</button>
+		<button class:active={tab === 'services'} onclick={() => (tab = 'services')}><Icon name="Blocks" size={14} /> Services</button>
+		<button class:active={tab === 'logs'} onclick={() => (tab = 'logs')}><Icon name="Document" size={14} /> System logs</button>
 	</nav>
 
 	{#if error}<p class="error">{error}</p>{/if}
@@ -179,6 +183,24 @@
 				</div>
 			{/each}
 		</div>
+	{:else if tab === 'services' || tab === 'logs'}
+		{#if host && !host.systemd}
+			<div class="panel note">
+				<Icon name="Information" size={18} />
+				<div>
+					<b>Needs a native install</b>
+					<p class="muted">
+						Managing host services and reading the system journal needs ServerDash running directly on a systemd host. This one is
+						running {host.deployment === 'container' ? 'in a container' : 'without systemd'}. Reinstall with
+						<code>install.sh --runtime native</code> to turn these on.
+					</p>
+				</div>
+			</div>
+		{:else if tab === 'services'}
+			<ServicesPanel {isAdmin} />
+		{:else}
+			<JournalViewer />
+		{/if}
 	{/if}
 </section>
 
@@ -275,6 +297,14 @@
 	.actions .btn {
 		padding: 6px 10px;
 		font-size: 11px;
+	}
+	.note {
+		display: flex;
+		gap: 12px;
+		align-items: flex-start;
+	}
+	.note p {
+		margin: 4px 0 0;
 	}
 	.ifaces {
 		display: grid;
