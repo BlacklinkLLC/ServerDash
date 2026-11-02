@@ -11,8 +11,14 @@
 # Or script it. Any flag you pass is used as the default, and --yes skips every
 # prompt. Without a terminal (CI, cron, ssh -T) it never prompts.
 #
+# It also installs a `serverdash` command, so you can change settings later:
+#   serverdash config          edit settings (port, public host, ...) interactively
+#   serverdash port 8080       change the port and restart
+#   serverdash status | restart | logs | update
+#
 # Safe to re-run: pulls the latest code, rebuilds the image, and restarts the
-# service. Never touches an existing .env or the SQLite data volume.
+# service. Never touches the SQLite data volume. An existing .env is left alone
+# unless you pass --port / --public-host or change them in the wizard.
 
 set -euo pipefail
 
@@ -27,6 +33,8 @@ PORT="9900"
 BRANCH="main"
 START_SERVICE=1
 ASSUME_YES=0
+PORT_SET=0
+HOST_SET=0
 
 SCRIPT_PATH=""
 SCRIPT_DIR=""
@@ -65,7 +73,8 @@ Options:
   --runtime docker|podman   Container runtime to install/use (default: docker)
   --dir PATH                Install directory (default: /opt/serverdash)
   --public-host HOST        Value for SERVERDASH_PUBLIC_HOST (default: nova.blacklink.net)
-  --port PORT               Host port to publish the dashboard on (default: 9900)
+  --port PORT               Host port to publish the dashboard on (default: 9900).
+                            Also updates an existing install's .env.
   --branch NAME             Git branch/tag to install (default: main)
   --no-start                Install and build, but don't enable/start the service
   -y, --yes                 Don't prompt; use the flags and defaults as given
@@ -73,6 +82,10 @@ Options:
 
 With a terminal attached, the installer is interactive and the flags above
 become the pre-filled defaults. NO_COLOR=1 turns off colors.
+
+After installing, use the `serverdash` command to change settings:
+  serverdash config         interactive settings editor
+  serverdash port 8080      change the port and restart
 EOF
 }
 
@@ -419,15 +432,32 @@ fetch_source() {
 	esac
 }
 
+set_env_key() { # set_env_key KEY VALUE (values are validated: no sed-special characters)
+	if grep -q "^$1=" .env; then
+		sed -i "s#^$1=.*#$1=$2#" .env
+	else
+		if [ -s .env ] && [ -n "$(tail -c1 .env)" ]; then echo >>.env; fi
+		echo "$1=$2" >>.env
+	fi
+}
+
 configure_env() {
 	cd "$INSTALL_DIR"
 	if [ ! -f .env ]; then
 		cp .env.example .env
-		sed -i "s#^SERVERDASH_PUBLIC_HOST=.*#SERVERDASH_PUBLIC_HOST=$PUBLIC_HOST#" .env
-		sed -i "s#^SERVERDASH_PORT=.*#SERVERDASH_PORT=$PORT#" .env
+		set_env_key SERVERDASH_PUBLIC_HOST "$PUBLIC_HOST"
+		set_env_key SERVERDASH_PORT "$PORT"
 		echo "Wrote .env (public host: $PUBLIC_HOST, port: $PORT)"
 	else
 		echo ".env already exists, leaving it as-is"
+		if [ "$HOST_SET" -eq 1 ]; then
+			set_env_key SERVERDASH_PUBLIC_HOST "$PUBLIC_HOST"
+			echo "Updated public host to $PUBLIC_HOST"
+		fi
+		if [ "$PORT_SET" -eq 1 ]; then
+			set_env_key SERVERDASH_PORT "$PORT"
+			echo "Updated port to $PORT"
+		fi
 	fi
 	if [ "$RUNTIME" = podman ]; then
 		# docker-compose.yml assumes Docker's socket path; point it at root
@@ -471,6 +501,579 @@ start_service() {
 	systemctl restart serverdash
 }
 
+install_cli() {
+	local bin_dir="${SERVERDASH_BIN_DIR:-/usr/local/bin}" conf_dir="${SERVERDASH_CONF_DIR:-/etc/serverdash}"
+	mkdir -p "$bin_dir" "$conf_dir"
+	{
+		printf 'SERVERDASH_DIR=%q\n' "$INSTALL_DIR"
+		printf 'COMPOSE_CMD=%q\n' "$COMPOSE_CMD"
+		printf 'RUNTIME=%q\n' "$RUNTIME"
+	} >"$conf_dir/install.conf"
+
+	cat >"$bin_dir/serverdash" <<'SERVERDASH_CLI_EOF'
+#!/usr/bin/env bash
+# serverdash: manage a ServerDash install.
+#
+#   serverdash config            interactive settings editor
+#   serverdash config set port 8080
+#   serverdash status | start | stop | restart | logs | update
+#
+# Installed by the ServerDash installer. Run `serverdash help` for everything.
+
+set -euo pipefail
+
+CONF="${SERVERDASH_CONF:-/etc/serverdash/install.conf}"
+if [ ! -r "$CONF" ]; then
+	echo "serverdash: $CONF not found. Re-run the ServerDash installer." >&2
+	exit 1
+fi
+# shellcheck disable=SC1090
+. "$CONF"
+ENV_FILE="$SERVERDASH_DIR/.env"
+SERVICE=serverdash
+ARGS=("$@")
+
+# ───────────────────────────── ui ─────────────────────────────
+
+ANIM=0
+INTERACTIVE=0
+if [ -t 1 ]; then ANIM=1; fi
+if [ -t 0 ] && [ -t 1 ]; then INTERACTIVE=1; fi
+
+RST="" BOLD="" DIM="" RED="" GREEN="" YELLOW="" GRAY="" AMBER=""
+if [ "$ANIM" -eq 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != dumb ]; then
+	RST=$'\033[0m' BOLD=$'\033[1m' DIM=$'\033[2m'
+	RED=$'\033[38;5;203m' GREEN=$'\033[38;5;114m' YELLOW=$'\033[38;5;221m' GRAY=$'\033[38;5;245m'
+	case "${COLORTERM:-}" in
+		*truecolor*|*24bit*) AMBER=$'\033[38;2;255;176;32m' ;;
+		*) AMBER=$'\033[38;5;214m' ;;
+	esac
+fi
+
+UNICODE=0
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+	*[Uu][Tt][Ff]-8*|*[Uu][Tt][Ff]8*) UNICODE=1 ;;
+esac
+if [ "${TERM:-}" = linux ]; then UNICODE=0; fi
+
+if [ "$UNICODE" -eq 1 ]; then
+	G_OK="✔" G_FAIL="✖" G_WARN="▲" G_SEL="❯" G_DOT="●" G_TO="→"
+	B_TL="╭" B_TR="╮" B_BL="╰" B_BR="╯" B_H="─" B_V="│"
+	SPIN=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+else
+	G_OK="+" G_FAIL="x" G_WARN="!" G_SEL=">" G_DOT="*" G_TO="->"
+	B_TL="+" B_TR="+" B_BL="+" B_BR="+" B_H="-" B_V="|"
+	SPIN=("|" "/" "-" "\\")
+fi
+
+PROMPT=$'\001'"${AMBER}"$'\002'"${G_SEL} "$'\001'"${RST}"$'\002'
+
+W="$(tput cols 2>/dev/null || true)"
+[[ "$W" =~ ^[0-9]+$ ]] || W=80
+if [ "$W" -gt 76 ]; then W=76; fi
+if [ "$W" -lt 60 ]; then W=60; fi
+
+BG_PID=""
+MENU_RESULT=0
+DIRTY=0
+
+cursor_hide() { if [ "$ANIM" -eq 1 ]; then printf '\033[?25l'; fi; return 0; }
+cursor_show() { if [ "$ANIM" -eq 1 ]; then printf '\033[?25h'; fi; return 0; }
+cleanup() {
+	cursor_show
+	if [ -n "$BG_PID" ]; then kill "$BG_PID" 2>/dev/null || true; fi
+	if [ "$INTERACTIVE" -eq 1 ]; then stty sane 2>/dev/null || true; fi
+	return 0
+}
+on_signal() { cursor_show; printf '\n'; exit 130; }
+trap cleanup EXIT
+trap on_signal INT TERM
+
+ok()   { printf '  %s%s%s %s\n' "$GREEN" "$G_OK" "$RST" "$1"; }
+warn() { printf '  %s%s%s %s\n' "$YELLOW" "$G_WARN" "$RST" "$1"; }
+note() { printf '    %s%s%s\n' "$DIM" "$1" "$RST"; }
+die()  { printf '\n  %s%s%s %s\n\n' "$RED" "$G_FAIL" "$RST" "$1" >&2; exit 1; }
+
+rep() { local s="" i; for ((i = 0; i < $2; i++)); do s+="$1"; done; printf '%s' "$s"; }
+vlen() { local s; s="$(printf '%s' "$1" | sed $'s/\033\\[[0-9;?]*[a-zA-Z]//g')"; printf '%s' "${#s}"; }
+strip_ansi() { sed $'s/\033\\[[0-9;?]*[a-zA-Z]//g'; }
+erase_up() { printf '\033[%dA\033[J' "$1"; }
+fmt_time() { if [ "$1" -ge 60 ]; then printf '%dm %02ds' $(($1 / 60)) $(($1 % 60)); else printf '%ds' "$1"; fi; }
+
+header() {
+	printf '\n  %s%s%s %s%s%s  %s%s%s\n\n' "$AMBER" "$G_DOT" "$RST" "$BOLD" "ServerDash" "$RST" "$GRAY" "$1" "$RST"
+}
+
+panel() { # panel TITLE ROW...
+	local title=$1 inner=$((W - 4)) rest row pad
+	shift
+	rest=$((inner - 3 - $(vlen "$title")))
+	if [ "$rest" -lt 1 ]; then rest=1; fi
+	printf '  %s%s%s%s %s%s%s %s%s%s%s\n' "$AMBER" "$B_TL" "$B_H" "$RST" "$BOLD" "$title" "$RST" "$AMBER" "$(rep "$B_H" "$rest")" "$B_TR" "$RST"
+	for row in "$@"; do
+		pad=$((inner - 2 - $(vlen "$row")))
+		if [ "$pad" -lt 0 ]; then pad=0; fi
+		printf '  %s%s%s %s%*s %s%s%s\n' "$AMBER" "$B_V" "$RST" "$row" "$pad" "" "$AMBER" "$B_V" "$RST"
+	done
+	printf '  %s%s%s%s%s\n' "$AMBER" "$B_BL" "$(rep "$B_H" "$inner")" "$B_BR" "$RST"
+}
+
+kv() { printf '%s%-13s%s %s%s' "$GRAY" "$1" "$RST" "$2" "${3:+  $DIM$3$RST}"; }
+
+# menu TITLE DEFAULT LABEL DESC ...   -> MENU_RESULT  (q picks the last item)
+menu() {
+	local title=$1 sel=$2 lw=${MENU_LW:-14}
+	shift 2
+	local -a labels=() descs=()
+	local n i key rest
+	while [ $# -gt 0 ]; do
+		labels+=("$1")
+		descs+=("${2:-}")
+		shift 2
+	done
+	n=${#labels[@]}
+
+	_menu_draw() {
+		for ((i = 0; i < n; i++)); do
+			if [ "$i" -eq "$sel" ]; then
+				printf '\r\033[K  %s%s%s %s%-*s%s %s%s%s\n' "$AMBER" "$G_SEL" "$RST" "$BOLD" "$lw" "${labels[$i]}" "$RST" "$GRAY" "${descs[$i]}" "$RST"
+			else
+				printf '\r\033[K    %-*s %s%s%s\n' "$lw" "${labels[$i]}" "$DIM" "${descs[$i]}" "$RST"
+			fi
+		done
+	}
+
+	printf '  %s%s%s  %s↑/↓ move · enter select · q back%s\n' "$BOLD" "$title" "$RST" "$DIM" "$RST"
+	cursor_hide
+	_menu_draw
+	while :; do
+		key=""
+		IFS= read -rsn1 key || true
+		case "$key" in
+			$'\033')
+				rest=""
+				IFS= read -rsn2 -t 0.05 rest || true
+				case "$rest" in
+					'[A') sel=$(((sel + n - 1) % n)) ;;
+					'[B') sel=$(((sel + 1) % n)) ;;
+				esac
+				;;
+			k) sel=$(((sel + n - 1) % n)) ;;
+			j) sel=$(((sel + 1) % n)) ;;
+			[1-9]) if [ "$((key - 1))" -lt "$n" ]; then sel=$((key - 1)); fi ;;
+			q) sel=$((n - 1)); break ;;
+			'') break ;;
+		esac
+		printf '\033[%dA' "$n"
+		_menu_draw
+	done
+	erase_up $((n + 1))
+	cursor_show
+	MENU_RESULT=$sel
+}
+
+# ask KEY LABEL DEFAULT [HINT] -> REPLY   (validated against KEY, prefilled)
+ask() {
+	local key=$1 label=$2 def=$3 hint=${4:-} val err extra=0
+	while :; do
+		printf '  %s%s%s%s\n' "$BOLD" "$label" "$RST" "${hint:+  $DIM$hint$RST}"
+		val=""
+		IFS= read -r -e -i "$def" -p "$PROMPT" val || true
+		val="${val#"${val%%[![:space:]]*}"}"
+		val="${val%"${val##*[![:space:]]}"}"
+		if err="$(validate "$key" "$val")"; then
+			erase_up $((2 + extra))
+			REPLY=$val
+			return 0
+		fi
+		erase_up $((2 + extra))
+		printf '  %s%s%s %s\n' "$RED" "$G_FAIL" "$RST" "$err"
+		extra=$((extra + 1))
+		def=$val
+	done
+}
+
+# step LABEL COMMAND...   spinner around a command; shows the tail of its output on failure
+step() {
+	local label=$1 start=$SECONDS rc=0 i=0 log
+	shift
+	log="$(mktemp /tmp/serverdash-cli.XXXXXX)"
+	"$@" >"$log" 2>&1 </dev/null &
+	BG_PID=$!
+	if [ "$ANIM" -eq 1 ]; then
+		cursor_hide
+		while kill -0 "$BG_PID" 2>/dev/null; do
+			printf '\r\033[K  %s%s%s %s  %s%s%s' "$AMBER" "${SPIN[$((i % ${#SPIN[@]}))]}" "$RST" "$label" "$DIM" "$(fmt_time $((SECONDS - start)))" "$RST"
+			i=$((i + 1))
+			sleep 0.1
+		done
+		printf '\r\033[K'
+		cursor_show
+	fi
+	wait "$BG_PID" || rc=$?
+	BG_PID=""
+	if [ "$rc" -eq 0 ]; then
+		ok "$label"
+		rm -f "$log"
+		return 0
+	fi
+	printf '  %s%s%s %s\n\n' "$RED" "$G_FAIL" "$RST" "$label"
+	tail -n 15 "$log" | strip_ansi | cut -c1-$((W - 6)) | sed "s/^/    ${DIM}/; s/\$/${RST}/"
+	printf '\n'
+	rm -f "$log"
+	exit 1
+}
+
+# ───────────────────────────── settings ─────────────────────────────
+
+v_port() {
+	if [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; then return 0; fi
+	echo "Port must be a number from 1 to 65535"
+	return 1
+}
+v_host() {
+	if [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ ]]; then return 0; fi
+	echo "Enter a hostname like nova.example.com"
+	return 1
+}
+
+validate() { # validate KEY VALUE -> prints an error and returns 1 if invalid
+	case "$2" in *$'\n'*) echo "Value can't contain a newline"; return 1 ;; esac
+	case "$1" in
+		SERVERDASH_PORT) v_port "$2" ;;
+		SERVERDASH_PUBLIC_HOST) v_host "$2" ;;
+		*) return 0 ;;
+	esac
+}
+
+norm_key() { # port -> SERVERDASH_PORT, public-host -> SERVERDASH_PUBLIC_HOST
+	local k
+	k="$(printf '%s' "${1//-/_}" | tr 'a-z' 'A-Z')"
+	case "$k" in SERVERDASH_*) ;; *) k="SERVERDASH_$k" ;; esac
+	printf '%s' "$k"
+}
+
+label_for() {
+	case "$1" in
+		SERVERDASH_PORT) echo "Port" ;;
+		SERVERDASH_PUBLIC_HOST) echo "Public host" ;;
+		*) echo "$1" ;;
+	esac
+}
+
+env_get() {
+	{ sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null || true; } | tail -n 1 | sed -e 's/^"\(.*\)"$/\1/' -e 's/\r$//'
+}
+
+env_set() {
+	local key=$1 val=$2 esc
+	case "$val" in *[[:space:]]*) val="\"$val\"" ;; esac
+	esc="$(printf '%s' "$val" | sed -e 's/[\\&|]/\\&/g')"
+	touch "$ENV_FILE"
+	if grep -q "^$key=" "$ENV_FILE"; then
+		sed -i "s|^$key=.*|$key=$esc|" "$ENV_FILE"
+	else
+		if [ -s "$ENV_FILE" ] && [ -n "$(tail -c1 "$ENV_FILE")" ]; then echo >>"$ENV_FILE"; fi
+		printf '%s=%s\n' "$key" "$val" >>"$ENV_FILE"
+	fi
+}
+
+env_keys() { grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$ENV_FILE" 2>/dev/null | cut -d= -f1 || true; }
+
+need_root() {
+	if [ "$(id -u)" -ne 0 ]; then
+		if command -v sudo >/dev/null 2>&1; then
+			exec sudo -E "$(readlink -f "$0")" ${ARGS[@]+"${ARGS[@]}"}
+		fi
+		die "this needs root. Re-run with sudo."
+	fi
+}
+
+service_active() { systemctl is-active --quiet "$SERVICE" 2>/dev/null; }
+
+port_in_use() {
+	command -v ss >/dev/null 2>&1 && ss -ltnH "sport = :$1" 2>/dev/null | grep -q .
+}
+
+host_ip() {
+	local ip
+	ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+	printf '%s' "${ip:-<this-host>}"
+}
+
+show_url() {
+	local port
+	port="$(env_get SERVERDASH_PORT)"
+	printf '    %sOpen%s  %shttp://%s:%s%s\n' "$GRAY" "$RST" "$AMBER" "$(host_ip)" "${port:-9900}" "$RST"
+}
+
+apply_changes() {
+	if service_active; then
+		step "Restarting ServerDash to apply changes" systemctl restart "$SERVICE"
+		show_url
+	else
+		warn "ServerDash isn't running, so nothing was restarted"
+		note "changes apply the next time it starts: serverdash start"
+	fi
+}
+
+# ───────────────────────────── config ─────────────────────────────
+
+config_list() {
+	local key val
+	printf '\n'
+	while IFS= read -r key; do
+		[ -n "$key" ] || continue
+		val="$(env_get "$key")"
+		printf '  %s%-28s%s %s\n' "$GRAY" "$key" "$RST" "$val"
+	done < <(env_keys)
+	printf '\n'
+}
+
+config_set() {
+	local restart=1 key="" val="" have_val=0 a old err
+	for a in "$@"; do
+		case "$a" in
+			--no-restart) restart=0 ;;
+			*)
+				if [ -z "$key" ]; then key=$a
+				elif [ "$have_val" -eq 0 ]; then val=$a; have_val=1
+				else die "too many arguments (quote values that contain spaces)"; fi
+				;;
+		esac
+	done
+	if [ -z "$key" ] || [ "$have_val" -eq 0 ]; then die "usage: serverdash config set KEY VALUE [--no-restart]"; fi
+	need_root
+	key="$(norm_key "$key")"
+	err="$(validate "$key" "$val")" || die "$key: $err"
+	old="$(env_get "$key")"
+	if [ "$old" = "$val" ]; then
+		ok "$key is already ${val:-empty}"
+		return 0
+	fi
+	env_set "$key" "$val"
+	printf '\n'
+	ok "$key  ${DIM}${old:-empty} $G_TO ${val:-empty}${RST}"
+	if [ "$restart" -eq 1 ]; then
+		apply_changes
+	else
+		note "not restarted. Apply with: serverdash restart"
+	fi
+	printf '\n'
+}
+
+config_edit() {
+	need_root
+	local ed="${VISUAL:-${EDITOR:-}}"
+	if [ -z "$ed" ]; then
+		for ed in nano vim vi; do command -v "$ed" >/dev/null 2>&1 && break; done
+	fi
+	command -v "$ed" >/dev/null 2>&1 || die "no editor found. Set \$EDITOR."
+	"$ed" "$ENV_FILE"
+	DIRTY=1
+}
+
+edit_value() { # edit_value KEY -> sets DIRTY when the value changed
+	local key=$1 cur new hint=""
+	cur="$(env_get "$key")"
+	if [ "$key" = SERVERDASH_PORT ]; then hint="host port for the dashboard"; fi
+	if [ "$key" = SERVERDASH_PUBLIC_HOST ]; then hint="the domain you serve it from"; fi
+	while :; do
+		ask "$key" "$(label_for "$key")" "$cur" "$hint"
+		new=$REPLY
+		if [ "$key" = SERVERDASH_PORT ] && [ "$new" != "$cur" ] && port_in_use "$new"; then
+			menu "Port $new is already in use" 1 "Use it anyway" "ServerDash may fail to start" "Pick another" "Choose a different port"
+			if [ "$MENU_RESULT" -eq 1 ]; then cur=$new; continue; fi
+		fi
+		break
+	done
+	if [ "$new" != "$(env_get "$key")" ]; then
+		env_set "$key" "$new"
+		DIRTY=1
+	fi
+}
+
+config_interactive() {
+	if [ "$INTERACTIVE" -eq 0 ]; then die "not a terminal. Use: serverdash config set KEY VALUE"; fi
+	need_root
+	header "settings"
+	local -a keys margs
+	local k v n
+	while :; do
+		keys=(SERVERDASH_PORT SERVERDASH_PUBLIC_HOST)
+		while IFS= read -r k; do
+			[ -n "$k" ] || continue
+			case "$k" in SERVERDASH_PORT|SERVERDASH_PUBLIC_HOST) continue ;; esac
+			keys+=("$k")
+		done < <(env_keys)
+
+		margs=()
+		for k in "${keys[@]}"; do
+			v="$(env_get "$k")"
+			margs+=("$(label_for "$k")" "${v:0:$((W - 36))}")
+		done
+		n=${#keys[@]}
+		margs+=("Edit .env" "Open the file in your editor")
+		margs+=("Apply" "$([ "$DIRTY" -eq 1 ] && echo 'Restart ServerDash to use your changes' || echo 'Restart ServerDash')")
+		margs+=("Done" "Leave settings")
+
+		MENU_LW=26 menu "Settings" 0 "${margs[@]}"
+		if [ "$MENU_RESULT" -lt "$n" ]; then
+			edit_value "${keys[$MENU_RESULT]}"
+		elif [ "$MENU_RESULT" -eq "$n" ]; then
+			config_edit
+		elif [ "$MENU_RESULT" -eq $((n + 1)) ]; then
+			apply_changes
+			DIRTY=0
+		else
+			break
+		fi
+	done
+	if [ "$DIRTY" -eq 1 ]; then
+		menu "Restart now to apply your changes?" 0 "Restart" "Apply the new settings" "Later" "Keep running with the old settings"
+		if [ "$MENU_RESULT" -eq 0 ]; then apply_changes; else note "apply later with: serverdash restart"; fi
+	fi
+	printf '\n'
+}
+
+cmd_config() {
+	local sub=""
+	if [ $# -gt 0 ]; then sub=$1; shift; fi
+	case "$sub" in
+		"") config_interactive ;;
+		list|ls) config_list ;;
+		get)
+			if [ $# -lt 1 ]; then die "usage: serverdash config get KEY"; fi
+			env_get "$(norm_key "$1")"
+			;;
+		set) config_set "$@" ;;
+		edit) config_edit; apply_changes ;;
+		*) die "unknown config command '$sub' (try: list, get, set, edit)" ;;
+	esac
+}
+
+cmd_port() {
+	if [ $# -eq 0 ]; then
+		env_get SERVERDASH_PORT
+	else
+		config_set SERVERDASH_PORT "$@"
+	fi
+}
+
+# ───────────────────────────── service control ─────────────────────────────
+
+cmd_status() {
+	local state version port host
+	port="$(env_get SERVERDASH_PORT)"
+	host="$(env_get SERVERDASH_PUBLIC_HOST)"
+	if service_active; then
+		state="${GREEN}${G_DOT} running${RST}"
+	else
+		state="${YELLOW}${G_DOT} stopped${RST}"
+	fi
+	version="$(git -C "$SERVERDASH_DIR" log -1 --format='%h  %cs' 2>/dev/null || echo unknown)"
+	printf '\n'
+	panel "ServerDash" \
+		"$(kv "Status" "$state")" \
+		"$(kv "Local URL" "http://$(host_ip):${port:-9900}")" \
+		"$(kv "Public URL" "https://${host:-unset}")" \
+		"$(kv "Directory" "$SERVERDASH_DIR")" \
+		"$(kv "Runtime" "$COMPOSE_CMD")" \
+		"$(kv "Version" "$version")"
+	printf '\n'
+}
+
+cmd_start()   { need_root; step "Starting ServerDash" systemctl start "$SERVICE"; show_url; }
+cmd_stop()    { need_root; step "Stopping ServerDash" systemctl stop "$SERVICE"; }
+cmd_restart() { need_root; step "Restarting ServerDash" systemctl restart "$SERVICE"; show_url; }
+
+cmd_logs() {
+	need_root
+	cd "$SERVERDASH_DIR"
+	if [ $# -eq 0 ]; then set -- -f --tail 100; fi
+	# shellcheck disable=SC2086
+	exec $COMPOSE_CMD logs "$@"
+}
+
+do_pull()  { git -C "$SERVERDASH_DIR" pull --ff-only; }
+do_build() { cd "$SERVERDASH_DIR" && BUILDKIT_PROGRESS=plain $COMPOSE_CMD up -d --build; }
+
+cmd_update() {
+	need_root
+	[ -d "$SERVERDASH_DIR/.git" ] || die "$SERVERDASH_DIR is not a git checkout, so it can't update itself"
+	printf '\n'
+	step "Fetching the latest ServerDash" do_pull
+	step "Rebuilding and restarting" do_build
+	show_url
+	printf '\n'
+}
+
+cmd_version() {
+	git -C "$SERVERDASH_DIR" log -1 --format='serverdash %h (%cs)' 2>/dev/null || echo "serverdash (unknown version)"
+}
+
+cmd_help() {
+	cat <<EOF
+
+  ${BOLD}serverdash${RST}  manage your ServerDash install
+
+  ${AMBER}Settings${RST}
+    serverdash config               edit settings interactively
+    serverdash config list          show every setting
+    serverdash config get KEY       print one setting
+    serverdash config set KEY VAL   change a setting and restart  (--no-restart to skip)
+    serverdash config edit          open .env in \$EDITOR
+    serverdash port [NUMBER]        show or change the port
+
+  ${AMBER}Service${RST}
+    serverdash status               state, URLs and version
+    serverdash start | stop | restart
+    serverdash logs [ARGS]          follow logs (defaults to -f --tail 100)
+    serverdash update               pull the latest code and rebuild
+    serverdash version
+
+  KEY can be short: ${DIM}port${RST}, ${DIM}public-host${RST}, or a full name like ${DIM}SERVERDASH_KUBECONFIG${RST}.
+
+EOF
+}
+
+main() {
+	local cmd=""
+	if [ $# -gt 0 ]; then cmd=$1; shift; fi
+	case "$cmd" in
+		config|cfg|settings) cmd_config "$@" ;;
+		port) cmd_port "$@" ;;
+		status|st) cmd_status ;;
+		start) cmd_start ;;
+		stop) cmd_stop ;;
+		restart) cmd_restart ;;
+		logs|log) cmd_logs "$@" ;;
+		update|upgrade) cmd_update ;;
+		version|--version|-v) cmd_version ;;
+		""|help|-h|--help) cmd_help ;;
+		*) die "unknown command '$cmd'. Try: serverdash help" ;;
+	esac
+}
+
+main "$@"
+SERVERDASH_CLI_EOF
+	chmod 755 "$bin_dir/serverdash"
+
+	if [ -d /etc/bash_completion.d ]; then
+		cat >/etc/bash_completion.d/serverdash <<'COMPLETION_EOF'
+_serverdash() {
+	local cur=${COMP_WORDS[COMP_CWORD]}
+	if [ "$COMP_CWORD" -eq 1 ]; then
+		COMPREPLY=($(compgen -W "config port status start stop restart logs update version help" -- "$cur"))
+	elif [ "${COMP_WORDS[1]}" = config ] && [ "$COMP_CWORD" -eq 2 ]; then
+		COMPREPLY=($(compgen -W "list get set edit" -- "$cur"))
+	fi
+}
+complete -F _serverdash serverdash
+COMPLETION_EOF
+	fi
+}
+
 wait_healthy() {
 	local i
 	command -v curl >/dev/null 2>&1 || return 0
@@ -499,8 +1102,8 @@ resolve_source() {
 	ENV_EXISTS=0
 	if [ -f "$INSTALL_DIR/.env" ]; then
 		ENV_EXISTS=1
-		v="$(env_val SERVERDASH_PUBLIC_HOST)"; if [ -n "$v" ]; then PUBLIC_HOST=$v; fi
-		v="$(env_val SERVERDASH_PORT)"; if [ -n "$v" ]; then PORT=$v; fi
+		v="$(env_val SERVERDASH_PUBLIC_HOST)"; if [ -n "$v" ] && [ "$HOST_SET" -eq 0 ]; then PUBLIC_HOST=$v; fi
+		v="$(env_val SERVERDASH_PORT)"; if [ -n "$v" ] && [ "$PORT_SET" -eq 0 ]; then PORT=$v; fi
 	fi
 }
 
@@ -527,21 +1130,29 @@ choose_runtime() {
 }
 
 print_settings() {
-	local mode_label dir_tag="" env_tag=""
+	local mode_label dir_tag="" env_tag="" host_tag="" port_tag=""
 	case "$MODE" in
 		local) mode_label="Use this checkout"; dir_tag="(this checkout)" ;;
 		update) mode_label="Upgrade existing install" ;;
 		clone) mode_label="Fresh install" ;;
 	esac
 	if [ "$ENV_EXISTS" -eq 1 ]; then env_tag="(from existing .env)"; fi
+	host_tag=$env_tag port_tag=$env_tag
+	if [ "$ENV_EXISTS" -eq 1 ] && [ "$HOST_SET" -eq 1 ]; then host_tag="(will update .env)"; fi
+	if [ "$ENV_EXISTS" -eq 1 ] && [ "$PORT_SET" -eq 1 ]; then port_tag="(will update .env)"; fi
 	panel "Install settings" \
 		"$(kv "Mode" "$mode_label")" \
 		"$(kv "Runtime" "$RUNTIME")" \
 		"$(kv "Directory" "$INSTALL_DIR" "$dir_tag")" \
-		"$(kv "Public host" "$PUBLIC_HOST" "$env_tag")" \
-		"$(kv "Port" "$PORT" "$env_tag")" \
+		"$(kv "Public host" "$PUBLIC_HOST" "$host_tag")" \
+		"$(kv "Port" "$PORT" "$port_tag")" \
 		"$(kv "Branch" "$BRANCH")" \
 		"$(kv "Service" "$([ "$START_SERVICE" -eq 1 ] && echo 'enable and start on boot' || echo 'install only, do not start')")"
+}
+
+edit_port() {
+	ask "Port" "$PORT" v_port "host port for the dashboard"
+	if [ "$REPLY" != "$PORT" ]; then PORT=$REPLY; PORT_SET=1; fi
 }
 
 edit_settings() {
@@ -550,12 +1161,9 @@ edit_settings() {
 		INSTALL_DIR=$REPLY
 		resolve_source
 	fi
-	if [ "$ENV_EXISTS" -eq 0 ]; then
-		ask "Public host" "$PUBLIC_HOST" v_host "the domain you'll serve it from"
-		PUBLIC_HOST=$REPLY
-		ask "Port" "$PORT" v_port "host port for the dashboard"
-		PORT=$REPLY
-	fi
+	ask "Public host" "$PUBLIC_HOST" v_host "the domain you'll serve it from"
+	if [ "$REPLY" != "$PUBLIC_HOST" ]; then PUBLIC_HOST=$REPLY; HOST_SET=1; fi
+	edit_port
 	ask "Branch or tag" "$BRANCH" v_branch "what to install"
 	BRANCH=$REPLY
 	choose_runtime
@@ -577,12 +1185,14 @@ review_settings() {
 		printf '\n'
 		menu "Ready to install?" 0 \
 			"Install" "Go ahead with these settings" \
-			"Change" "Edit directory, host, port, runtime…" \
+			"Port" "Change just the port (now $PORT)" \
+			"Customize" "Directory, host, branch, runtime…" \
 			"Cancel" "Exit without changing anything"
 		case "$MENU_RESULT" in
 			0) return 0 ;;
-			1) erase_up $((PANEL_LINES + 1)); edit_settings ;;
-			2) on_signal ;;
+			1) erase_up $((PANEL_LINES + 1)); edit_port ;;
+			2) erase_up $((PANEL_LINES + 1)); edit_settings ;;
+			3) on_signal ;;
 		esac
 	done
 }
@@ -654,6 +1264,7 @@ install_all() {
 
 	run_step "Building the image (a few minutes the first time)" build_image
 	run_step "Installing the systemd service" write_unit
+	run_step "Installing the serverdash command" install_cli
 
 	if [ "$START_SERVICE" -eq 1 ]; then
 		run_step "Starting ServerDash" start_service
@@ -682,6 +1293,7 @@ summary() {
 			"$(kv "Public URL" "https://$PUBLIC_HOST" "(via reverse proxy)")" \
 			"$(kv "Directory" "$INSTALL_DIR")" \
 			"$(kv "Runtime" "$COMPOSE_CMD")" \
+			"$(kv "Manage" "${AMBER}serverdash config${RST}" "(port, host, …)")" \
 			"$(kv "Data" "serverdash-data volume, kept on upgrade")"
 	else
 		panel "$title" \
@@ -698,9 +1310,11 @@ summary() {
 	fi
 
 	printf '\n  %sUseful commands%s\n' "$BOLD" "$RST"
-	printf '    %ssystemctl status serverdash%s\n' "$GRAY" "$RST"
-	printf '    %scd %s && %s logs -f%s\n' "$GRAY" "$INSTALL_DIR" "$COMPOSE_CMD" "$RST"
-	printf '    %sre-run this installer to upgrade%s\n' "$GRAY" "$RST"
+	printf '    %sserverdash config%s        change the port, public host and more\n' "$AMBER" "$RST"
+	printf '    %sserverdash port 8080%s     change just the port\n' "$AMBER" "$RST"
+	printf '    %sserverdash status%s        state, URLs and version\n' "$AMBER" "$RST"
+	printf '    %sserverdash logs%s          follow the logs\n' "$AMBER" "$RST"
+	printf '    %sserverdash update%s        pull the latest code and rebuild\n' "$AMBER" "$RST"
 	printf '\n  %s%s%s Done in %s\n\n' "$GREEN" "$G_OK" "$RST" "$took"
 	rm -f "$LOG"
 }
@@ -710,8 +1324,8 @@ parse_args() {
 		case "$1" in
 			--runtime)     [ $# -ge 2 ] || die "--runtime needs a value"; RUNTIME=$2; RUNTIME_FLAG=1; shift 2 ;;
 			--dir)         [ $# -ge 2 ] || die "--dir needs a value"; INSTALL_DIR=$2; shift 2 ;;
-			--public-host) [ $# -ge 2 ] || die "--public-host needs a value"; PUBLIC_HOST=$2; shift 2 ;;
-			--port)        [ $# -ge 2 ] || die "--port needs a value"; PORT=$2; shift 2 ;;
+			--public-host) [ $# -ge 2 ] || die "--public-host needs a value"; PUBLIC_HOST=$2; HOST_SET=1; shift 2 ;;
+			--port)        [ $# -ge 2 ] || die "--port needs a value"; PORT=$2; PORT_SET=1; shift 2 ;;
 			--branch)      [ $# -ge 2 ] || die "--branch needs a value"; BRANCH=$2; shift 2 ;;
 			--no-start)    START_SERVICE=0; shift ;;
 			-y|--yes)      ASSUME_YES=1; shift ;;
