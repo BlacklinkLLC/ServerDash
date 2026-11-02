@@ -1,7 +1,11 @@
 package api
 
 import (
+	"errors"
 	"net/http"
+	"strings"
+
+	"serverdash/internal/cluster"
 
 	"serverdash/internal/auth"
 	"serverdash/internal/store"
@@ -13,12 +17,13 @@ func (s *Server) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"needsSetup": count == 0})
+	writeJSON(w, http.StatusOK, map[string]bool{"needsSetup": count == 0, "codeRequired": count == 0 && s.cfg.SetupCode != ""})
 }
 
 type setupRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	SetupCode string `json:"setupCode,omitempty"`
 }
 
 // handleSetup creates the first admin account. It's only ever valid once —
@@ -39,6 +44,10 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	var req setupRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if s.cfg.SetupCode != "" && !cluster.SecretsEqual(normalizeCode(req.SetupCode), normalizeCode(s.cfg.SetupCode)) {
+		writeError(w, http.StatusForbidden, errors.New("that setup code isn't right; it was shown when ServerDash was installed (run `serverdash setup-code` to see it again)"))
 		return
 	}
 	if err := validateCredentials(req.Username, req.Password); err != nil {
@@ -109,4 +118,10 @@ type userDTO struct {
 
 func userResponse(u store.User) userDTO {
 	return userDTO{ID: u.ID, Username: u.Username, Role: string(u.Role), CreatedAt: u.CreatedAt.Format(timeFormat)}
+}
+
+// normalizeCode makes setup-code entry forgiving: case, spaces, and the
+// dashes the installer groups it with don't matter.
+func normalizeCode(c string) string {
+	return strings.ToUpper(strings.NewReplacer(" ", "", "-", "").Replace(strings.TrimSpace(c)))
 }

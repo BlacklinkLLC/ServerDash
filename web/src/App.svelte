@@ -1,11 +1,12 @@
 <script>
 	import { onDestroy, onMount } from 'svelte';
-	import { api } from './lib/api.js';
+	import { api, setTargetNode } from './lib/api.js';
 	import { applyAccentColor } from './lib/color.js';
 	import SystemOverview from './lib/SystemOverview.svelte';
 	import ContainerList from './lib/ContainerList.svelte';
 	import KubernetesView from './lib/KubernetesView.svelte';
 	import ToolsView from './lib/ToolsView.svelte';
+	import ClusterView from './lib/ClusterView.svelte';
 	import AdminPanel from './lib/admin/AdminPanel.svelte';
 	import SetupPage from './lib/SetupPage.svelte';
 	import LoginPage from './lib/LoginPage.svelte';
@@ -19,7 +20,7 @@
 	let branding = $state({ appName: 'ServerDash', logoUrl: null, accentColor: '#ffb020', showSystem: true, showContainers: true, refreshSeconds: 5, widgets: [] });
 	let runtime = $state(null);
 
-	const pages = ['dashboard', 'tools', 'kubernetes', 'admin'];
+	const pages = ['dashboard', 'tools', 'kubernetes', 'cluster', 'admin'];
 	// The page lives in the URL hash so a refresh or shared link lands on it.
 	let page = $state(pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard');
 	$effect(() => {
@@ -31,6 +32,29 @@
 	let metricsHistory = $state([]);
 	let topProcesses = $state(null);
 	let host = $state(null);
+	let cluster = $state(null);
+	// The cluster node whose dashboard is being viewed (null = this server).
+	let target = $state(null);
+	let targetNode = $derived(cluster?.nodes?.find((n) => n.id === target) ?? null);
+
+	function loadCluster() {
+		api.cluster()
+			.then((c) => (cluster = c))
+			.catch(() => {});
+	}
+
+	function openServer(id) {
+		target = id;
+		setTargetNode(id);
+		snapshot = null;
+		containers = [];
+		metricsHistory = [];
+		topProcesses = null;
+		runtime = null;
+		host = null;
+		if (page === 'cluster' || page === 'admin') page = 'dashboard';
+		refresh();
+	}
 	let error = $state(null);
 
 	async function loadBranding() {
@@ -93,6 +117,7 @@
 			}
 			error = e.message;
 		}
+		if (page === 'cluster' || !cluster) loadCluster();
 		if (page === 'dashboard') {
 			api.systemHistory()
 				.then((h) => (metricsHistory = h))
@@ -115,6 +140,7 @@
 	$effect(() => {
 		if (authState === 'ready') {
 			page;
+			target;
 			if (!host) {
 				api.host()
 					.then((h) => (host = h))
@@ -139,7 +165,7 @@
 {#if authState === 'loading'}
 	<div class="center"><p class="muted">Loading…</p></div>
 {:else if authState === 'setup'}
-	<SetupPage {branding} onready={onAuthed} />
+	<SetupPage {branding} onready={onAuthed} onbrandingchange={onBrandingChange} />
 {:else if authState === 'login'}
 	<LoginPage {branding} onready={onAuthed} />
 {:else}
@@ -151,11 +177,23 @@
 		<nav>
 			<button class:active={page === 'dashboard'} onclick={() => (page = 'dashboard')}><Icon name="Home" size={14} /> Dashboard</button>
 			<button class:active={page === 'tools'} onclick={() => (page = 'tools')}><Icon name="Settings" size={14} /> Tools</button>
+			<button class:active={page === 'cluster'} onclick={() => (page = 'cluster')}><Icon name="Connect" size={14} /> Cluster</button>
 			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}><Icon name="Cloud" size={14} /> Kubernetes</button>
-			{#if isAdmin}
+			{#if isAdmin && !target}
 				<button class:active={page === 'admin'} onclick={() => (page = 'admin')}><Icon name="Shield" size={14} /> Admin</button>
 			{/if}
 		</nav>
+		{#if cluster?.nodes?.length}
+			<label class="switcher" title="Choose which server to manage">
+				<Icon name="Desktop" size={14} />
+				<select value={target ?? ''} onchange={(e) => openServer(e.currentTarget.value || null)}>
+					<option value="">{cluster.self?.hostname ?? 'This server'} (this server)</option>
+					{#each cluster.nodes as n (n.id)}
+						<option value={n.id} disabled={!n.online || !n.url}>{n.name}{n.online ? '' : ' (offline)'}{n.url ? '' : ' (no address)'}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
 		<div class="user">
 			<span class="who"><Icon name="User" size={14} /> {user.username} <span class="muted">({user.role})</span></span>
 			<button class="btn subtle signout" onclick={logout}><Icon name="Exit" size={13} /> Sign out</button>
@@ -163,6 +201,13 @@
 	</header>
 
 	<main>
+		{#if targetNode}
+			<div class="remote-banner">
+				<Icon name="Connect" size={15} />
+				<span>Managing <b>{targetNode.name}</b> through this server{targetNode.role === 'replica' ? ' · replica' : ''}</span>
+				<button class="btn subtle" onclick={() => openServer(null)}>Back to this server</button>
+			</div>
+		{/if}
 		{#if error}
 			<p class="error">Couldn't reach {branding.appName}'s API: {error}</p>
 		{/if}
@@ -184,6 +229,17 @@
 			{/if}
 		{:else if page === 'tools'}
 			<ToolsView {isAdmin} {host} refreshSeconds={branding.refreshSeconds || 5} />
+		{:else if page === 'cluster'}
+			<ClusterView
+				{cluster}
+				{isAdmin}
+				settings={branding}
+				onopen={(id) => {
+					openServer(id);
+					page = 'dashboard';
+				}}
+				onchange={loadCluster}
+			/>
 		{:else if page === 'kubernetes'}
 			<KubernetesView {canOperate} />
 		{:else if page === 'admin'}
@@ -249,6 +305,31 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
+	}
+	.switcher {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--muted);
+	}
+	.switcher select {
+		padding: 7px 10px;
+		font-size: 12px;
+		border-radius: 10px;
+	}
+	.remote-banner {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 14px;
+		border-radius: 12px;
+		border: 1px solid var(--border-strong);
+		background: var(--accent-soft);
+		font-size: 12px;
+	}
+	.remote-banner .btn {
+		margin-left: auto;
+		padding: 6px 12px;
 	}
 	.user {
 		display: flex;

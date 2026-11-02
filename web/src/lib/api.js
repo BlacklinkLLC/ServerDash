@@ -9,8 +9,28 @@ export class ApiError extends Error {
 	}
 }
 
+// --- Cluster target ---
+// When a cluster node is selected in the server switcher, server-scoped
+// calls (metrics, containers, pods, tools) are routed through this
+// primary's proxy to that node. Everything else (auth, settings, admin)
+// always stays on the server you're signed in to. Mirrors the backend's
+// proxyablePrefixes.
+const proxyable = ['/api/system', '/api/runtime', '/api/host', '/api/containers', '/api/k8s', '/api/services', '/api/journal'];
+let targetNode = null;
+
+export function setTargetNode(id) {
+	targetNode = id || null;
+}
+
+function route(path) {
+	if (!targetNode) return path;
+	const bare = path.split('?')[0];
+	if (!proxyable.some((p) => bare === p || bare.startsWith(p + '/'))) return path;
+	return `/api/cluster/nodes/${encodeURIComponent(targetNode)}/proxy${path}`;
+}
+
 async function request(path, options = {}) {
-	const res = await fetch(path, {
+	const res = await fetch(route(path), {
 		headers: { 'Content-Type': 'application/json' },
 		credentials: 'include',
 		...options,
@@ -29,13 +49,13 @@ const put = (path, body) => request(path, { method: 'PUT', body: JSON.stringify(
 
 function wsUrl(path) {
 	const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-	return `${proto}//${window.location.host}${path}`;
+	return `${proto}//${window.location.host}${route(path)}`;
 }
 
 export const api = {
 	// --- Auth / setup ---
 	setupStatus: () => request('/api/setup/status'),
-	setup: (username, password) => post('/api/setup', { username, password }),
+	setup: (username, password, setupCode) => post('/api/setup', { username, password, setupCode }),
 	login: (username, password) => post('/api/auth/login', { username, password }),
 	logout: () => post('/api/auth/logout'),
 	me: () => request('/api/auth/me'),
@@ -112,6 +132,16 @@ export const api = {
 	deleteWorkflow: (id) => del(`/api/workflows/${id}`),
 	runWorkflow: (id) => post(`/api/workflows/${id}/run`),
 	workflowRuns: (id) => request(`/api/workflows/${id}/runs`),
+
+	// --- Cluster ---
+	cluster: () => request('/api/cluster'),
+	setClusterMode: (mode) => put('/api/cluster/mode', { mode }),
+	createJoinToken: (role, primaryUrl, ttlHours) => post('/api/cluster/tokens', { role, primaryUrl, ttlHours }),
+	updateClusterNode: (id, node) => put(`/api/cluster/nodes/${id}`, node),
+	deleteClusterNode: (id) => del(`/api/cluster/nodes/${id}`),
+	joinCluster: (token, name, selfUrl) => post('/api/cluster/join', { token, name, selfUrl }),
+	leaveCluster: () => post('/api/cluster/leave'),
+	updateClusterSelf: (name, selfUrl) => put('/api/cluster/self', { name, selfUrl }),
 
 	// --- Settings / branding / appearance ---
 	settings: () => request('/api/settings'),

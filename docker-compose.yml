@@ -26,6 +26,9 @@ services:
       # Self-update (optional): only needed if you uncomment the install-dir
       # mount below. Enables Admin → Updates.
       SERVERDASH_INSTALL_DIR: "${SERVERDASH_INSTALL_DIR:-}"
+      # Set by the installer's browser setup option: must be entered on the
+      # first-run setup screen before the admin account can be created.
+      SERVERDASH_SETUP_CODE: "${SERVERDASH_SETUP_CODE:-}"
     volumes:
       # Users, sessions, nicknames, automation rules, and scripts (SQLite).
       - serverdash-data:/data

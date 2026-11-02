@@ -45,6 +45,16 @@ The script installs Docker if it's missing (or Podman, with `--runtime podman`),
 
 It's safe to re-run, which also upgrades an existing install. Run `install.sh --help` for the full list of options: `--dir`, `--public-host`, `--port`, `--branch`, and `--no-start`.
 
+### Setting up in the browser
+
+Add `--web-setup` (or choose **In your browser** in the interactive installer) to install with defaults and finish on a web page instead of the terminal:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/BlacklinkLLC/ServerDash/main/install.sh | sudo bash -s -- --web-setup
+```
+
+The installer prints the dashboard address and a one-time **setup code**. The setup screen asks for that code before it creates the admin account, so nobody who reaches the page first can take over the server. It then walks through branding (name, accent color, theme) and the server's [cluster](#clusters-nodes-and-replicas) role. Lost the code? Run `sudo serverdash setup-code`. Without the installer, set `SERVERDASH_SETUP_CODE` yourself to get the same protection.
+
 ### Without Docker (native install)
 
 ServerDash can also run directly on the host, with no container runtime:
@@ -68,6 +78,25 @@ To run it by hand without the installer:
 scripts/build-native.sh
 SERVERDASH_WEB_DIR=$PWD/web/dist SERVERDASH_PORT=9900 SERVERDASH_DB_PATH=/var/lib/serverdash/serverdash.db sudo -E bin/serverdash
 ```
+
+## Clusters, nodes, and replicas
+
+Several ServerDash instances can be linked so one dashboard manages them all.
+
+- **Primary**: the server you manage the others from. Any server becomes a primary when you create its first join token.
+- **Node**: sends the primary its status (CPU, memory, disk, containers) every 15 seconds. If the primary can reach the node's address, you can switch to the node in the header's server picker and use its dashboard, tools, containers, and pods from the primary, with your own role's permissions.
+- **Replica**: a node that also mirrors the primary's users (password hashes, never plaintext) and appearance settings, so the same logins and branding work there. A replica's own users are **replaced** by the primary's. Changes sync within one heartbeat.
+
+To add a server, go to **Cluster → Add a server** on the primary, choose Node or Replica, and create a join token (single-use, expires in 1 hour to 7 days). Paste it into the new server's browser setup, or into **Cluster → Join a cluster** on an existing server.
+
+How it works:
+
+- Nodes always connect *to* the primary, so a node behind NAT still reports its status. Managing it from the primary also needs the primary to reach the node's address.
+- The primary authenticates to each node with its own random secret. Your session cookie is never forwarded to a node.
+- Only server-scoped endpoints (metrics, containers, Kubernetes, tools, services, journal) can be reached through the primary. Users, settings, automation, and cluster settings always stay local to each server.
+- Use HTTPS addresses for servers that talk over untrusted networks: heartbeats carry the node's secret and, for replicas, user password hashes.
+
+Removing a node revokes its secret; it keeps running standalone until it joins again. **Leave cluster** on a node does the same from its side, keeping any users and settings it already had.
 
 ## Features
 

@@ -76,6 +76,11 @@ func UserFromContext(ctx context.Context) (store.User, bool) {
 type Middleware struct {
 	Store       *store.Store
 	PublicPaths map[string]bool
+	// ClusterAuth, if set, authenticates requests a cluster primary
+	// proxies to this node (no session cookie, a shared-secret header
+	// instead). ok=false means "not a cluster request": fall through to
+	// cookie auth; a non-nil err rejects the request outright.
+	ClusterAuth func(r *http.Request) (user store.User, ok bool, err error)
 }
 
 func (m *Middleware) Wrap(next http.Handler) http.Handler {
@@ -83,6 +88,16 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		if m.PublicPaths[r.Method+" "+r.URL.Path] {
 			next.ServeHTTP(w, r)
 			return
+		}
+
+		if m.ClusterAuth != nil {
+			if user, ok, err := m.ClusterAuth(r); err != nil {
+				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusForbidden)
+				return
+			} else if ok {
+				next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userContextKey, user)))
+				return
+			}
 		}
 
 		cookie, err := r.Cookie(CookieName)

@@ -46,6 +46,11 @@ type Config struct {
 	// UpdateCmd is what self-update hands the rebuild to on a native
 	// install (run via systemd-run so it outlives this process).
 	UpdateCmd []string
+	// SetupCode, when set, must be entered on the first-run setup screen
+	// before the admin account can be created. The installer's web setup
+	// option generates one, so whoever reaches the page first can't claim
+	// the server.
+	SetupCode string
 }
 
 func Load() Config {
@@ -62,6 +67,7 @@ func Load() Config {
 		InstallDir: getEnv("SERVERDASH_INSTALL_DIR", ""),
 		WebDir:     getEnv("SERVERDASH_WEB_DIR", ""),
 		UpdateCmd:  strings.Fields(getEnv("SERVERDASH_UPDATE_CMD", "")),
+		SetupCode:  strings.TrimSpace(getEnv("SERVERDASH_SETUP_CODE", "")),
 	}
 }
 

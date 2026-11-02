@@ -86,6 +86,26 @@ CREATE TABLE IF NOT EXISTS workflows (
 	updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Cluster (primary side): nodes that joined this instance, and the
+-- single-use tokens that let them join.
+CREATE TABLE IF NOT EXISTS cluster_nodes (
+	id          TEXT PRIMARY KEY,
+	name        TEXT NOT NULL,
+	url         TEXT NOT NULL DEFAULT '',
+	role        TEXT NOT NULL CHECK(role IN ('node','replica')),
+	secret      TEXT NOT NULL,
+	last_seen   DATETIME,
+	last_status TEXT NOT NULL DEFAULT '{}',
+	created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cluster_tokens (
+	token_hash TEXT PRIMARY KEY,
+	role       TEXT NOT NULL CHECK(role IN ('node','replica')),
+	expires_at DATETIME NOT NULL,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS workflow_runs (
 	id           INTEGER PRIMARY KEY AUTOINCREMENT,
 	workflow_id  INTEGER NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,

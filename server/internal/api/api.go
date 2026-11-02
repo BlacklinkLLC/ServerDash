@@ -12,6 +12,7 @@ import (
 
 	"serverdash/internal/auth"
 	"serverdash/internal/automation"
+	"serverdash/internal/cluster"
 	"serverdash/internal/config"
 	"serverdash/internal/containers"
 	"serverdash/internal/kubernetes"
@@ -26,12 +27,14 @@ type Server struct {
 	kube       *kubernetes.Client
 	automation *automation.Runner
 	sampler    *system.Sampler
+	agent      *cluster.Agent
 	upgrader   websocket.Upgrader
 }
 
-func New(cfg config.Config, docker *containers.Client, st *store.Store, kube *kubernetes.Client, runner *automation.Runner, sampler *system.Sampler) *Server {
+func New(cfg config.Config, docker *containers.Client, st *store.Store, kube *kubernetes.Client, runner *automation.Runner, sampler *system.Sampler, agent *cluster.Agent) *Server {
 	return &Server{
 		sampler:    sampler,
+		agent:      agent,
 		cfg:        cfg,
 		docker:     docker,
 		store:      st,
@@ -57,6 +60,10 @@ var publicPaths = map[string]bool{
 	"POST /api/auth/login":   true,
 	"GET /api/settings":      true,
 	"GET /api/branding/logo": true,
+	// Cluster: authenticated by a single-use join token / node secret
+	// instead of a session.
+	"POST /api/cluster/register":  true,
+	"POST /api/cluster/heartbeat": true,
 }
 
 func (s *Server) Routes() http.Handler {
@@ -136,6 +143,19 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/workflows/{id}/run", auth.RequireRole(s.handleRunWorkflow, store.RoleAdmin))
 	mux.HandleFunc("GET /api/workflows/{id}/runs", auth.RequireRole(s.handleListWorkflowRuns, store.RoleAdmin))
 
+	// --- Cluster: primaries, nodes, replicas ---
+	mux.HandleFunc("GET /api/cluster", s.handleClusterOverview)
+	mux.HandleFunc("PUT /api/cluster/mode", auth.RequireRole(s.handleClusterMode, store.RoleAdmin))
+	mux.HandleFunc("POST /api/cluster/tokens", auth.RequireRole(s.handleCreateJoinToken, store.RoleAdmin))
+	mux.HandleFunc("POST /api/cluster/register", s.handleClusterRegister)
+	mux.HandleFunc("POST /api/cluster/heartbeat", s.handleClusterHeartbeat)
+	mux.HandleFunc("PUT /api/cluster/nodes/{id}", auth.RequireRole(s.handleUpdateClusterNode, store.RoleAdmin))
+	mux.HandleFunc("DELETE /api/cluster/nodes/{id}", auth.RequireRole(s.handleDeleteClusterNode, store.RoleAdmin))
+	mux.HandleFunc("/api/cluster/nodes/{id}/proxy/{path...}", s.handleClusterProxy)
+	mux.HandleFunc("POST /api/cluster/join", auth.RequireRole(s.handleClusterJoin, store.RoleAdmin))
+	mux.HandleFunc("POST /api/cluster/leave", auth.RequireRole(s.handleClusterLeave, store.RoleAdmin))
+	mux.HandleFunc("PUT /api/cluster/self", auth.RequireRole(s.handleClusterSelf, store.RoleAdmin))
+
 	// --- Settings / branding ---
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("PUT /api/settings", auth.RequireRole(s.handleUpdateSettings, store.RoleAdmin))
@@ -147,7 +167,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/updates/status", auth.RequireRole(s.handleUpdateStatus, store.RoleAdmin))
 	mux.HandleFunc("POST /api/updates/apply", auth.RequireRole(s.handleApplyUpdate, store.RoleAdmin))
 
-	authMW := &auth.Middleware{Store: s.store, PublicPaths: publicPaths}
+	authMW := &auth.Middleware{Store: s.store, PublicPaths: publicPaths, ClusterAuth: s.clusterAuth}
 	return withLogging(withStatic(s.cfg.WebDir, withCORS(s.cfg.PublicHost, authMW.Wrap(mux))))
 }
 

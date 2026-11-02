@@ -13,6 +13,7 @@ import (
 
 	"serverdash/internal/api"
 	"serverdash/internal/automation"
+	"serverdash/internal/cluster"
 	"serverdash/internal/config"
 	"serverdash/internal/containers"
 	"serverdash/internal/kubernetes"
@@ -52,7 +53,12 @@ func main() {
 	sampler := system.NewSampler(5*time.Second, 720)
 	sampler.Start(context.Background())
 
-	srv := api.New(cfg, dockerClient, db, kubeClient, runner, sampler)
+	var srv *api.Server
+	agent := cluster.NewAgent(db, func(ctx context.Context) cluster.Status { return srv.CollectStatus(ctx) })
+	srv = api.New(cfg, dockerClient, db, kubeClient, runner, sampler, agent)
+	// Started only once srv exists: the first heartbeat runs immediately
+	// and calls back into it for this server's status.
+	agent.Start(context.Background())
 
 	log.Printf("serverdash API listening on %s (container runtime: %s, kubernetes: %v, public host: %s)",
 		cfg.ListenAddr, cfg.DockerHost, kubernetes.Available(), cfg.PublicHost)

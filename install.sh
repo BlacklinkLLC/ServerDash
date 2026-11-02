@@ -44,6 +44,8 @@ ADMIN_MODE=generate              # generate | custom | skip
 ADMIN_USER="admin"
 ADMIN_PASS="${SERVERDASH_ADMIN_PASSWORD:-}"
 ADMIN_RESULT=""                  # created | exists | failed | "" (not attempted)
+SETUP_MODE=terminal              # terminal | web
+SETUP_CODE=""
 if [ -n "$ADMIN_PASS" ]; then ADMIN_MODE=custom; fi
 
 SCRIPT_PATH=""
@@ -97,6 +99,9 @@ Options:
                             Without one, a random password is generated and shown
                             once at the end.
   --no-admin                Don't create a login; use the browser setup screen
+  --web-setup               Install with defaults, then finish setup in your browser
+                            (admin account, branding, and cluster role). A one-time
+                            setup code is shown so nobody else can claim the server.
   --no-start                Install and build, but don't enable/start the service
   -y, --yes                 Don't prompt; use the flags and defaults as given
   -h, --help                Show this help
@@ -551,6 +556,10 @@ configure_env() {
 			set_env_key SERVERDASH_PORT "$PORT"
 			echo "Updated port to $PORT"
 		fi
+	fi
+	if [ "$SETUP_MODE" = web ]; then
+		set_env_key SERVERDASH_SETUP_CODE "$SETUP_CODE"
+		echo "Wrote a one-time setup code for the browser setup screen"
 	fi
 	if [ "$RUNTIME" = podman ]; then
 		# docker-compose.yml assumes Docker's socket path; point it at root
@@ -1145,6 +1154,19 @@ cmd_update() {
 	printf '\n'
 }
 
+cmd_setup_code() {
+	need_root
+	local code
+	code="$(env_get SERVERDASH_SETUP_CODE)"
+	if [ -z "$code" ]; then
+		echo "No setup code is set: this install doesn't use browser setup, or it was removed."
+		return 0
+	fi
+	printf '\n  Setup code: %s%s%s\n' "$BOLD" "$code" "$RST"
+	note "enter it on the setup screen at http://$(host_ip):$(env_get SERVERDASH_PORT)"
+	printf '\n'
+}
+
 cmd_version() {
 	git -C "$SERVERDASH_DIR" log -1 --format='serverdash %h (%cs)' 2>/dev/null || echo "serverdash (unknown version)"
 }
@@ -1168,6 +1190,7 @@ cmd_help() {
     serverdash logs [ARGS]          follow logs (defaults to -f --tail 100)
     serverdash update               pull the latest code and rebuild
     serverdash version
+    serverdash setup-code           show the browser setup code
 
   KEY can be short: ${DIM}port${RST}, ${DIM}public-host${RST}, or a full name like ${DIM}SERVERDASH_KUBECONFIG${RST}.
 
@@ -1187,6 +1210,7 @@ main() {
 		logs|log) cmd_logs "$@" ;;
 		update|upgrade) cmd_update ;;
 		version|--version|-v) cmd_version ;;
+		setup-code) cmd_setup_code ;;
 		""|help|-h|--help) cmd_help ;;
 		*) die "unknown command '$cmd'. Try: serverdash help" ;;
 	esac
@@ -1335,7 +1359,13 @@ print_settings() {
 	case "$ADMIN_MODE" in
 		generate) admin_text="$ADMIN_USER  ${DIM}+ generated password${RST}" ;;
 		custom)   admin_text="$ADMIN_USER  ${DIM}+ the password you set${RST}" ;;
-		skip)     admin_text="${DIM}none, use the browser setup screen${RST}" ;;
+		skip)
+			if [ "$SETUP_MODE" = web ]; then
+				admin_text="${DIM}created in the browser setup${RST}"
+			else
+				admin_text="${DIM}none, use the browser setup screen${RST}"
+			fi
+			;;
 	esac
 	if [ "$ADMIN_MODE" != skip ] && [ "$START_SERVICE" -eq 0 ]; then
 		admin_tag="(needs the service started)"
@@ -1404,13 +1434,34 @@ edit_settings() {
 	if [ "$MENU_RESULT" -eq 0 ]; then START_SERVICE=1; else START_SERVICE=0; fi
 }
 
+# enable_web_setup: the browser handles the admin account (protected by a
+# one-time setup code), branding, and cluster role.
+enable_web_setup() {
+	SETUP_MODE=web
+	ADMIN_MODE=skip
+	START_SERVICE=1
+	if [ -z "$SETUP_CODE" ]; then
+		SETUP_CODE="$(gen_password | cut -d- -f1-2)"
+	fi
+}
+
 review_settings() {
 	if [ "$PROMPTS" -eq 0 ]; then
 		print_settings
 		return 0
 	fi
 	section "Setup"
+	if [ "$SETUP_MODE" != web ] && [ "$MODE" != update ]; then
+		menu "How would you like to set up ServerDash?" 0 \
+			"In the terminal" "Answer a few questions here" \
+			"In your browser" "Install with defaults, then finish on a web page"
+		if [ "$MENU_RESULT" -eq 1 ]; then enable_web_setup; fi
+	fi
 	if [ "$RUNTIME_FLAG" -eq 0 ]; then choose_runtime; fi
+	if [ "$SETUP_MODE" = web ]; then
+		print_settings
+		return 0
+	fi
 	while :; do
 		print_settings
 		printf '\n'
@@ -1559,7 +1610,17 @@ summary() {
 	fi
 
 	printf '\n'
-	if [ "$START_SERVICE" -eq 1 ] && [ "$ADMIN_RESULT" = created ]; then
+	if [ "$SETUP_MODE" = web ] && [ "$START_SERVICE" -eq 1 ]; then
+		panel "Finish setup in your browser" \
+			"$(kv "Open" "${AMBER}http://$ip:$PORT${RST}")" \
+			"$(kv "Setup code" "${BOLD}${SETUP_CODE}${RST}")" \
+			"$(kv "Directory" "$INSTALL_DIR")" \
+			"$(kv "Runtime" "$RUNTIME_LABEL")" \
+			"$(kv "Data" "$DATA_LABEL")"
+		printf '\n  %s%s%s Open the address above and enter the setup code to create your admin account,\n' "$YELLOW" "$G_WARN" "$RST"
+		note "pick your branding, and choose whether this server joins a cluster."
+		note "lost the code? run: sudo serverdash setup-code"
+	elif [ "$START_SERVICE" -eq 1 ] && [ "$ADMIN_RESULT" = created ]; then
 		local pw_row
 		if [ "$ADMIN_MODE" = generate ]; then
 			pw_row="$(kv "Password" "${BOLD}${ADMIN_PASS}${RST}")"
@@ -1593,7 +1654,7 @@ summary() {
 		printf '\n  %s%s%s Save that password now. It is not stored anywhere else.\n' "$YELLOW" "$G_WARN" "$RST"
 		note "change it later under Admin → Users in the dashboard"
 	fi
-	if [ "$START_SERVICE" -eq 1 ] && [ "$MODE" != update ]; then
+	if [ "$START_SERVICE" -eq 1 ] && [ "$MODE" != update ] && [ "$SETUP_MODE" != web ]; then
 		printf '\n  %sNext%s\n' "$BOLD" "$RST"
 		if [ "$ADMIN_RESULT" = created ]; then
 			printf '    %s1.%s Open the URL above and sign in as %s\n' "$AMBER" "$RST" "$ADMIN_USER"
@@ -1626,6 +1687,7 @@ parse_args() {
 			--admin-user)  [ $# -ge 2 ] || die "--admin-user needs a value"; ADMIN_USER=$2; shift 2 ;;
 			--admin-password) [ $# -ge 2 ] || die "--admin-password needs a value"; ADMIN_PASS=$2; ADMIN_MODE=custom; shift 2 ;;
 			--no-admin)    ADMIN_MODE=skip; shift ;;
+			--web-setup)   WEB_SETUP_FLAG=1; shift ;;
 			--no-start)    START_SERVICE=0; shift ;;
 			-y|--yes)      ASSUME_YES=1; shift ;;
 			-h|--help)     usage; exit 0 ;;
@@ -1650,6 +1712,7 @@ main() {
 	ORIG_ARGS=("$@")
 	T0=$SECONDS
 	parse_args "$@"
+	if [ "${WEB_SETUP_FLAG:-0}" -eq 1 ]; then enable_web_setup; fi
 	init_ui
 	banner
 	preflight
