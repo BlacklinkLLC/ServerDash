@@ -4,6 +4,7 @@ package system
 import (
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -115,6 +116,9 @@ func Collect(hostRoot string) (Snapshot, error) {
 func collectDisks(parts []disk.PartitionStat, hostRoot string) []DiskUsage {
 	byDevice := make(map[string]disk.PartitionStat)
 	for _, p := range parts {
+		if isReadOnlyImage(p) {
+			continue
+		}
 		existing, ok := byDevice[p.Device]
 		if !ok || len(p.Mountpoint) < len(existing.Mountpoint) {
 			byDevice[p.Device] = p
@@ -140,4 +144,16 @@ func collectDisks(parts []disk.PartitionStat, hostRoot string) []DiskUsage {
 	}
 	sort.Slice(disks, func(i, j int) bool { return disks[i].Path < disks[j].Path })
 	return disks
+}
+
+// isReadOnlyImage reports mounts of read-only package images (snaps,
+// squashfs/erofs images like AppImages or live media). They're always
+// exactly 100% "full" by construction, so listing them is noise and would
+// pin the overview's health banner at Critical.
+func isReadOnlyImage(p disk.PartitionStat) bool {
+	switch p.Fstype {
+	case "squashfs", "erofs", "iso9660":
+		return true
+	}
+	return strings.HasPrefix(p.Mountpoint, "/snap/") || strings.HasPrefix(p.Mountpoint, "/var/lib/snapd/snap/")
 }
