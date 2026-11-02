@@ -1226,9 +1226,8 @@ cmd_uninstall() {
 	rm -f "$unit_dir/$SERVICE.service"
 	systemctl daemon-reload 2>/dev/null || true
 	step "Removing $SERVERDASH_DIR" rm -rf "$SERVERDASH_DIR"
-	rm -f /etc/bash_completion.d/serverdash
-	rm -rf "$conf_dir"
-	rm -f "$bin_dir/serverdash"
+	rm -f /etc/bash_completion.d/serverdash "$bin_dir/serverdash" 2>/dev/null || true
+	rm -rf "$conf_dir" 2>/dev/null || true
 	printf '\n'
 	ok "ServerDash is uninstalled"
 	if [ "${RUNTIME:-}" = native ]; then
