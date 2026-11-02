@@ -1,0 +1,17 @@
+{
+  "id": "serverdash-backup",
+  "name": "ServerDash backup",
+  "version": "1.0.0",
+  "description": "Backs up ServerDash's own database (users, settings, workflows, scripts). Add the action to a scheduled workflow for nightly backups.",
+  "author": "Blacklink",
+  "icon": "Save",
+  "settings": [
+    { "key": "keep", "label": "Backups to keep", "type": "number", "default": "7" }
+  ],
+  "widgets": [
+    { "id": "list", "title": "Backups", "format": "table", "command": "sh ./list.sh", "interval": 300 }
+  ],
+  "actions": [
+    { "id": "backup", "label": "Back up now", "command": "sh ./backup.sh" }
+  ]
+}

@@ -51,6 +51,9 @@ type Config struct {
 	// option generates one, so whoever reaches the page first can't claim
 	// the server.
 	SetupCode string
+	// PluginsDir holds the plugins that ship with ServerDash. Plugins an
+	// admin adds go in DataDir/plugins instead.
+	PluginsDir string
 }
 
 func Load() Config {
@@ -68,6 +71,7 @@ func Load() Config {
 		WebDir:     getEnv("SERVERDASH_WEB_DIR", ""),
 		UpdateCmd:  strings.Fields(getEnv("SERVERDASH_UPDATE_CMD", "")),
 		SetupCode:  strings.TrimSpace(getEnv("SERVERDASH_SETUP_CODE", "")),
+		PluginsDir: getEnv("SERVERDASH_PLUGINS_DIR", defaultPluginsDir()),
 	}
 }
 
@@ -112,4 +116,24 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// defaultPluginsDir finds the bundled plugins: /app/plugins in the
+// container image, or <checkout>/plugins next to a native bin/serverdash.
+func defaultPluginsDir() string {
+	candidates := []string{"/app/plugins"}
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		candidates = append(candidates, filepath.Join(dir, "plugins"), filepath.Join(dir, "..", "plugins"))
+	}
+	candidates = append(candidates, "./plugins", "../plugins")
+	for _, c := range candidates {
+		if st, err := os.Stat(c); err == nil && st.IsDir() {
+			if abs, err := filepath.Abs(c); err == nil {
+				return abs
+			}
+			return c
+		}
+	}
+	return ""
 }

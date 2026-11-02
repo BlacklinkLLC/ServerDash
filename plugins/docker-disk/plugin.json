@@ -1,0 +1,16 @@
+{
+  "id": "docker-disk",
+  "name": "Docker disk usage",
+  "version": "1.0.0",
+  "description": "Shows how much space images, containers, volumes and build cache use, and frees it up.",
+  "author": "Blacklink",
+  "icon": "Database",
+  "requires": ["docker"],
+  "widgets": [
+    { "id": "usage", "title": "Docker disk usage", "format": "stats", "command": "sh ./usage.sh", "interval": 300 }
+  ],
+  "actions": [
+    { "id": "prune-cache", "label": "Clear build cache", "command": "docker builder prune -f", "role": "operator" },
+    { "id": "prune-images", "label": "Remove unused images", "command": "docker image prune -af", "confirm": "Remove every image no container is using? They'll be downloaded again when needed.", "danger": true }
+  ]
+}

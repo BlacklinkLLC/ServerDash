@@ -7,6 +7,8 @@
 	import KubernetesView from './lib/KubernetesView.svelte';
 	import ToolsView from './lib/ToolsView.svelte';
 	import ClusterView from './lib/ClusterView.svelte';
+	import PluginsView from './lib/plugins/PluginsView.svelte';
+	import DashboardPlugins from './lib/plugins/DashboardPlugins.svelte';
 	import AutomationsView from './lib/automations/AutomationsView.svelte';
 	import AdminPanel from './lib/admin/AdminPanel.svelte';
 	import SetupPage from './lib/SetupPage.svelte';
@@ -21,7 +23,7 @@
 	let branding = $state({ appName: 'ServerDash', logoUrl: null, accentColor: '#ffb020', showSystem: true, showContainers: true, refreshSeconds: 5, widgets: [] });
 	let runtime = $state(null);
 
-	const pages = ['dashboard', 'tools', 'kubernetes', 'cluster', 'automations', 'admin'];
+	const pages = ['dashboard', 'tools', 'kubernetes', 'cluster', 'plugins', 'automations', 'admin'];
 	// The page lives in the URL hash so a refresh or shared link lands on it.
 	let page = $state(pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard');
 	$effect(() => {
@@ -53,10 +55,11 @@
 		topProcesses = null;
 		runtime = null;
 		host = null;
-		if (page === 'cluster' || page === 'admin' || page === 'automations') page = 'dashboard';
+		if (page === 'cluster' || page === 'admin' || page === 'automations' || page === 'plugins') page = 'dashboard';
 		refresh();
 	}
 	let error = $state(null);
+	let pluginsVersion = $state(0);
 
 	async function loadBranding() {
 		try {
@@ -180,6 +183,9 @@
 			<button class:active={page === 'tools'} onclick={() => (page = 'tools')}><Icon name="Settings" size={14} /> Tools</button>
 			<button class:active={page === 'cluster'} onclick={() => (page = 'cluster')}><Icon name="Connect" size={14} /> Cluster</button>
 			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}><Icon name="Cloud" size={14} /> Kubernetes</button>
+			{#if !target}
+				<button class:active={page === 'plugins'} onclick={() => (page = 'plugins')}><Icon name="Puzzle" size={14} /> Plugins</button>
+			{/if}
 			{#if isAdmin && !target}
 				<button class:active={page === 'automations'} onclick={() => (page = 'automations')}><Icon name="Lightning" size={14} /> Automations</button>
 				<button class:active={page === 'admin'} onclick={() => (page = 'admin')}><Icon name="Shield" size={14} /> Admin</button>
@@ -226,6 +232,7 @@
 					onnavigate={(p) => (page = p)}
 				/>
 			{/if}
+			{#if !target}<DashboardPlugins version={pluginsVersion} />{/if}
 			{#if branding.showContainers && host?.containersRuntime !== false}
 				<ContainerList {containers} {canOperate} {isAdmin} onaction={refresh} />
 			{/if}
@@ -244,6 +251,8 @@
 			/>
 		{:else if page === 'kubernetes'}
 			<KubernetesView {canOperate} />
+		{:else if page === 'plugins'}
+			<PluginsView {isAdmin} onchange={() => pluginsVersion++} />
 		{:else if page === 'automations'}
 			<AutomationsView />
 		{:else if page === 'admin'}

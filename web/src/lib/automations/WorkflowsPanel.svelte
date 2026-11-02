@@ -9,6 +9,7 @@
 	let lastRuns = $state({});
 	let containers = $state([]);
 	let scripts = $state([]);
+	let plugins = $state([]);
 	let error = $state(null);
 	let loading = $state(true);
 	let filter = $state('');
@@ -37,6 +38,9 @@
 	load();
 	api.containers()
 		.then((l) => (containers = l.map((c) => c.name.replace(/^\//, ''))))
+		.catch(() => {});
+	api.plugins()
+		.then((r) => (plugins = r.plugins))
 		.catch(() => {});
 	api.scripts()
 		.then((l) => (scripts = l))
@@ -119,7 +123,7 @@
 
 {#if editing}
 	<div class="panel">
-		<WorkflowEditor workflow={editing} {containers} {scripts} onsave={save} oncancel={() => (editing = null)} />
+		<WorkflowEditor workflow={editing} {containers} {scripts} {plugins} onsave={save} oncancel={() => (editing = null)} />
 	</div>
 {:else}
 	<div class="toolbar">

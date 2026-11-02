@@ -47,6 +47,9 @@ func NewRunner(st *store.Store, docker *containers.Client, composeCmd []string, 
 	}
 }
 
+// SetPlugins lets workflows run plugin actions.
+func (r *Runner) SetPlugins(p workflow.PluginRunner) { r.executor.Plugins = p }
+
 // Start begins running the unhealthy-restart ticker and loads the cron
 // schedule from the database. Call Reload after any change to automation
 // rules or scripts so the running schedule picks it up without a restart.

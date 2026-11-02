@@ -43,6 +43,7 @@ const (
 	BlockRunScript        BlockType = "run_script"
 	BlockPrune            BlockType = "prune"
 	BlockCheck            BlockType = "check"
+	BlockPluginAction     BlockType = "plugin_action"
 )
 
 // Check kinds for the check block ("only continue if ...").
@@ -81,6 +82,9 @@ type Block struct {
 	Action  string `json:"action,omitempty"`  // service_action: start | stop | restart | reload
 
 	ScriptID int64 `json:"scriptId,omitempty"` // run_script
+
+	Plugin       string `json:"plugin,omitempty"`       // plugin_action: plugin ID
+	PluginAction string `json:"pluginAction,omitempty"` // plugin_action: action ID
 
 	Check     string  `json:"check,omitempty"`     // check: one of the Check* kinds
 	Threshold float64 `json:"threshold,omitempty"` // check: percent for the *_above/below kinds
@@ -167,6 +171,11 @@ func Validate(blocks []Block) error {
 				err = fmt.Errorf("block %d (%s): choose a script", i+1, b.Type)
 			}
 		case BlockPrune:
+		case BlockPluginAction:
+			err = req("plugin", b.Plugin)
+			if err == nil {
+				err = req("action", b.PluginAction)
+			}
 		case BlockCheck:
 			if !validChecks[b.Check] {
 				err = fmt.Errorf("block %d (%s): unknown check %q", i+1, b.Type, b.Check)
@@ -209,6 +218,12 @@ type Executor struct {
 	Store      *store.Store
 	HostRoot   string
 	HTTP       *http.Client
+	Plugins    PluginRunner
+}
+
+// PluginRunner runs plugin actions; implemented by plugins.Manager.
+type PluginRunner interface {
+	RunAction(ctx context.Context, id, actionID string, role store.Role) (string, error)
 }
 
 // Context describes why a run is happening; its fields are available to
@@ -301,6 +316,8 @@ func describeBlock(b Block) string {
 		return fmt.Sprintf("%s service %s", b.Action, b.Service)
 	case BlockRunScript:
 		return fmt.Sprintf("run script #%d", b.ScriptID)
+	case BlockPluginAction:
+		return fmt.Sprintf("run plugin action %s/%s", b.Plugin, b.PluginAction)
 	case BlockPrune:
 		return "prune unused containers, images, and volumes"
 	case BlockCheck:
@@ -407,6 +424,12 @@ func maxDisk(snap system.Snapshot) float64 {
 
 func (e *Executor) runBlock(ctx context.Context, b Block, st *runState) (string, error) {
 	switch b.Type {
+	case BlockPluginAction:
+		if e.Plugins == nil {
+			return "", fmt.Errorf("plugins aren't available")
+		}
+		return e.Plugins.RunAction(ctx, b.Plugin, b.PluginAction, store.RoleAdmin)
+
 	case BlockGitPull:
 		// ServerDash's container runs as root while a bind-mounted project
 		// directory is typically host-user-owned, which git's ownership

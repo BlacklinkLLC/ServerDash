@@ -16,6 +16,7 @@ import (
 	"serverdash/internal/config"
 	"serverdash/internal/containers"
 	"serverdash/internal/kubernetes"
+	"serverdash/internal/plugins"
 	"serverdash/internal/store"
 	"serverdash/internal/system"
 )
@@ -28,11 +29,13 @@ type Server struct {
 	automation *automation.Runner
 	sampler    *system.Sampler
 	agent      *cluster.Agent
+	plugins    *plugins.Manager
 	upgrader   websocket.Upgrader
 }
 
-func New(cfg config.Config, docker *containers.Client, st *store.Store, kube *kubernetes.Client, runner *automation.Runner, sampler *system.Sampler, agent *cluster.Agent) *Server {
+func New(cfg config.Config, docker *containers.Client, st *store.Store, kube *kubernetes.Client, runner *automation.Runner, sampler *system.Sampler, agent *cluster.Agent, pm *plugins.Manager) *Server {
 	return &Server{
+		plugins:    pm,
 		sampler:    sampler,
 		agent:      agent,
 		cfg:        cfg,
@@ -144,6 +147,14 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/workflows/{id}/runs", auth.RequireRole(s.handleListWorkflowRuns, store.RoleAdmin))
 	mux.HandleFunc("GET /api/workflow-runs", auth.RequireRole(s.handleRecentWorkflowRuns, store.RoleAdmin))
 	mux.HandleFunc("POST /api/hooks/{token}", s.handleWorkflowHook)
+
+	// --- Plugins: widgets for everyone signed in; managing them is admin-only,
+	// and each action declares which role may run it.
+	mux.HandleFunc("GET /api/plugins", s.handleListPlugins)
+	mux.HandleFunc("POST /api/plugins/reload", auth.RequireRole(s.handleReloadPlugins, store.RoleAdmin))
+	mux.HandleFunc("PUT /api/plugins/{id}", auth.RequireRole(s.handleUpdatePlugin, store.RoleAdmin))
+	mux.HandleFunc("GET /api/plugins/{id}/widgets/{widget}", s.handlePluginWidget)
+	mux.HandleFunc("POST /api/plugins/{id}/actions/{action}", auth.RequireRole(s.handlePluginAction, store.RoleAdmin, store.RoleOperator))
 
 	// --- Cluster: primaries, nodes, replicas ---
 	mux.HandleFunc("GET /api/cluster", s.handleClusterOverview)

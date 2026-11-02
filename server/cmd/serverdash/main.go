@@ -8,6 +8,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"path/filepath"
 	"time"
 	_ "time/tzdata" // embeds the IANA zone database in the binary: the Alpine base image doesn't ship it, and without this, a workflow's "CRON_TZ=America/Chicago ..." trigger silently fails to register
 
@@ -17,6 +18,7 @@ import (
 	"serverdash/internal/config"
 	"serverdash/internal/containers"
 	"serverdash/internal/kubernetes"
+	"serverdash/internal/plugins"
 	"serverdash/internal/store"
 	"serverdash/internal/system"
 )
@@ -45,7 +47,15 @@ func main() {
 
 	kubeClient := kubernetes.New(cfg.Kubeconfig)
 
+	pluginEnv := []string{"SERVERDASH_DB_PATH=" + cfg.DBPath, "SERVERDASH_DATA_DIR=" + cfg.DataDir}
+	if cfg.HostRoot != "" {
+		pluginEnv = append(pluginEnv, "SERVERDASH_HOST_ROOT="+cfg.HostRoot)
+	}
+	pluginManager := plugins.New(db, cfg.PluginsDir, filepath.Join(cfg.DataDir, "plugins"), pluginEnv)
+	log.Printf("serverdash: %d plugins found (bundled: %q, yours: %q)", len(pluginManager.List()), pluginManager.BundledDir, pluginManager.UserDir)
+
 	runner := automation.NewRunner(db, dockerClient, cfg.ComposeCmd, cfg.HostRoot)
+	runner.SetPlugins(pluginManager)
 	runner.Start(context.Background())
 	defer runner.Stop()
 
@@ -55,7 +65,7 @@ func main() {
 
 	var srv *api.Server
 	agent := cluster.NewAgent(db, func(ctx context.Context) cluster.Status { return srv.CollectStatus(ctx) })
-	srv = api.New(cfg, dockerClient, db, kubeClient, runner, sampler, agent)
+	srv = api.New(cfg, dockerClient, db, kubeClient, runner, sampler, agent, pluginManager)
 	// Started only once srv exists: the first heartbeat runs immediately
 	// and calls back into it for this server's status.
 	agent.Start(context.Background())

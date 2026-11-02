@@ -4,7 +4,7 @@
 	import { api } from '../api.js';
 	import { TRIGGERS, BLOCKS, CHECKS, VARIABLES, blankTrigger, blankBlock, blockMeta } from './catalog.js';
 
-	let { workflow, containers = [], scripts = [], onsave, oncancel } = $props();
+	let { workflow, containers = [], scripts = [], plugins = [], onsave, oncancel } = $props();
 
 	const TIMEZONES = [
 		'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Anchorage',
@@ -281,6 +281,16 @@
 												<textarea rows="3" class="mono" bind:value={b[f.key]} placeholder={f.placeholder} spellcheck="false"></textarea>
 											{:else if f.kind === 'container'}
 												<input bind:value={b[f.key]} list="ctr-names" placeholder="name or ID" />
+											{:else if f.kind === 'plugin'}
+												<select bind:value={b[f.key]} onchange={() => (b.pluginAction = undefined)}>
+													<option value={undefined} disabled>Choose a plugin…</option>
+													{#each plugins.filter((p) => p.actions?.length) as p (p.id)}<option value={p.id}>{p.name}{p.enabled ? '' : ' (disabled)'}</option>{/each}
+												</select>
+											{:else if f.kind === 'pluginAction'}
+												<select bind:value={b[f.key]} disabled={!b.plugin}>
+													<option value={undefined} disabled>Choose an action…</option>
+													{#each plugins.find((p) => p.id === b.plugin)?.actions ?? [] as a (a.id)}<option value={a.id}>{a.label}</option>{/each}
+												</select>
 											{:else if f.kind === 'script'}
 												<select bind:value={b[f.key]}>
 													<option value={undefined} disabled>Choose a script…</option>

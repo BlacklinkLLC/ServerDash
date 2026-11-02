@@ -193,6 +193,14 @@ To use those two blocks, uncomment `security_opt: label=disable` in `docker-comp
 
 Git's "dubious ownership" check, which would otherwise trigger because the container runs as root over a host-user-owned directory, is handled for you. No `safe.directory` setup is needed.
 
+## Plugins
+
+The **Plugins** page adds widgets and tools to ServerDash. Each plugin is a folder with a `plugin.json` and a few shell scripts. Six ship with ServerDash: SSL certificates, Uptime monitor, Docker disk usage, Folder sizes, ServerDash backup, and Public IP.
+
+All plugins start turned off. Under Plugins → Manage, an admin can turn one on, change its settings, and show its widgets on the dashboard. Plugin actions can also run from a workflow with the **Run plugin action** block.
+
+Plugins run commands with ServerDash's own permissions, so only add plugins you trust. To write your own, see [plugins/README.md](plugins/README.md).
+
 ## Self-update
 
 Admin → Updates compares ServerDash's own git checkout against its remote (`git fetch`, then `HEAD` against `origin/<branch>`). If something new is available, one click pulls and redeploys it.

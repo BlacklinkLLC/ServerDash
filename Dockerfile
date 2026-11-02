@@ -19,10 +19,11 @@ RUN npm prune --omit=dev
 FROM node:22-alpine
 # supervisor: runs the Go API and Node web processes under one PID.
 # kubectl: optional Kubernetes support — a no-op if no kubeconfig is mounted.
+# curl, openssl, sqlite: used by the bundled plugins (plugins/).
 # git, docker-cli(-compose): the git_pull and compose_up workflow blocks —
 # ServerDash shells out to these against the mounted docker.sock, so it
 # needs its own copies even though it never runs a container build itself.
-RUN apk add --no-cache supervisor kubectl git docker-cli docker-cli-compose
+RUN apk add --no-cache supervisor kubectl git docker-cli docker-cli-compose curl openssl sqlite
 WORKDIR /app
 
 COPY --from=go-builder /out/serverdash /app/serverdash
@@ -31,6 +32,7 @@ COPY --from=web-builder /src/server /app/web/server
 COPY --from=web-builder /src/node_modules /app/web/node_modules
 COPY --from=web-builder /src/package.json /app/web/package.json
 COPY docker/supervisord.conf /etc/supervisord.conf
+COPY plugins /app/plugins
 
 ENV SERVERDASH_LISTEN_ADDR=:8080 \
     SERVERDASH_API_URL=http://127.0.0.1:8080 \

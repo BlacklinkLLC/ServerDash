@@ -1,0 +1,16 @@
+{
+  "id": "folder-sizes",
+  "name": "Folder sizes",
+  "version": "1.0.0",
+  "description": "Tracks how big the folders you care about are.",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "requires": ["du"],
+  "settings": [
+    { "key": "paths", "label": "Folders", "type": "textarea", "default": "/home\n/var/log\n/opt", "help": "One host path per line." },
+    { "key": "warn_gb", "label": "Highlight folders larger than (GB)", "type": "number", "default": "50" }
+  ],
+  "widgets": [
+    { "id": "sizes", "title": "Folder sizes", "format": "table", "command": "sh ./sizes.sh", "interval": 1800 }
+  ]
+}

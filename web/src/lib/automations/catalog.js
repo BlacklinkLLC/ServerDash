@@ -89,6 +89,16 @@ export const BLOCKS = [
 	},
 	{ type: 'run_script', label: 'Run saved script', icon: 'Script', group: 'Server', fields: [{ key: 'scriptId', label: 'Script', kind: 'script' }] },
 	{
+		type: 'plugin_action',
+		label: 'Run plugin action',
+		icon: 'Puzzle',
+		group: 'Server',
+		fields: [
+			{ key: 'plugin', label: 'Plugin', kind: 'plugin' },
+			{ key: 'pluginAction', label: 'Action', kind: 'pluginAction' },
+		],
+	},
+	{
 		type: 'service_action',
 		label: 'Control a service',
 		icon: 'Settings',

@@ -1,0 +1,16 @@
+{
+  "id": "ssl-certs",
+  "name": "SSL certificates",
+  "version": "1.0.0",
+  "description": "Warns before your TLS certificates expire.",
+  "author": "Blacklink",
+  "icon": "Lock",
+  "requires": ["openssl"],
+  "settings": [
+    { "key": "hosts", "label": "Hosts to check", "type": "textarea", "default": "nova.blacklink.net", "placeholder": "example.com\nmail.example.com:465", "help": "One per line, as host or host:port (default port 443)." },
+    { "key": "warn_days", "label": "Warn when fewer than this many days are left", "type": "number", "default": "14" }
+  ],
+  "widgets": [
+    { "id": "expiry", "title": "Certificate expiry", "format": "table", "command": "sh ./check.sh", "interval": 3600, "wide": true }
+  ]
+}

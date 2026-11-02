@@ -132,6 +132,17 @@ export const api = {
 	deleteWorkflow: (id) => del(`/api/workflows/${id}`),
 	runWorkflow: (id) => post(`/api/workflows/${id}/run`),
 	workflowRuns: (id) => request(`/api/workflows/${id}/runs`),
+	plugins: () => request('/api/plugins'),
+	reloadPlugins: () => request('/api/plugins/reload', { method: 'POST' }),
+	updatePlugin: (id, state) => request(`/api/plugins/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(state) }),
+	pluginWidget: (id, widget, refresh = false) =>
+		request(`/api/plugins/${encodeURIComponent(id)}/widgets/${encodeURIComponent(widget)}${refresh ? '?refresh=1' : ''}`),
+	// Resolves with {ok, output, error} even when the command fails, so its output can be shown.
+	runPluginAction: async (id, action) => {
+		const res = await fetch(`/api/plugins/${encodeURIComponent(id)}/actions/${encodeURIComponent(action)}`, { method: 'POST', credentials: 'include' });
+		const body = await res.json().catch(() => ({}));
+		return { ok: res.ok && body.ok !== false, output: body.output ?? '', error: body.error ?? (res.ok ? '' : `${res.status} ${res.statusText}`) };
+	},
 	recentWorkflowRuns: (limit = 50) => request(`/api/workflow-runs?limit=${limit}`),
 	workflowHookUrl: (token) => `${window.location.origin}/api/hooks/${token}`,
 

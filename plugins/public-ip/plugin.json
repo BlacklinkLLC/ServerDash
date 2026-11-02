@@ -1,0 +1,12 @@
+{
+  "id": "public-ip",
+  "name": "Public IP",
+  "version": "1.0.0",
+  "description": "Shows this server's public IP address and where it appears to be. Asks ipinfo.io.",
+  "author": "Blacklink",
+  "icon": "Globe",
+  "requires": ["curl"],
+  "widgets": [
+    { "id": "ip", "title": "Public IP", "format": "stats", "command": "sh ./ip.sh", "interval": 900 }
+  ]
+}
