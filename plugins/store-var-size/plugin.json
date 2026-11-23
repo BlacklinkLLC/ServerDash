@@ -1,0 +1,18 @@
+{
+  "id": "store-var-size",
+  "name": "Var Directory",
+  "version": "1.0.0",
+  "description": "Size of /var",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Var Directory",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

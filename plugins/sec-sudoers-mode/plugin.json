@@ -1,0 +1,18 @@
+{
+  "id": "sec-sudoers-mode",
+  "name": "Sudoers Mode",
+  "version": "1.0.0",
+  "description": "sudoers file mode",
+  "author": "Blacklink",
+  "icon": "Shield",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Sudoers Mode",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

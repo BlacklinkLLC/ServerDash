@@ -1,0 +1,30 @@
+{
+  "id": "net-ping-host",
+  "name": "Host Ping",
+  "version": "1.0.0",
+  "description": "ICMP to configured host",
+  "author": "Blacklink",
+  "icon": "Ethernet",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Host Ping",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ping"
+  ],
+  "settings": [
+    {
+      "key": "host",
+      "label": "Host",
+      "type": "text",
+      "default": "example.com",
+      "help": "Hostname or IP address"
+    }
+  ]
+}

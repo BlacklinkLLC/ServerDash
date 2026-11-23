@@ -1,0 +1,18 @@
+{
+  "id": "store-mount-count",
+  "name": "Mounts",
+  "version": "1.0.0",
+  "description": "Active mounts",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Mounts",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

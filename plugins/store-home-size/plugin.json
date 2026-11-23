@@ -1,0 +1,18 @@
+{
+  "id": "store-home-size",
+  "name": "Home Directory",
+  "version": "1.0.0",
+  "description": "Size of /home",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Home Directory",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "svc-mysql",
+  "name": "MySQL Service",
+  "version": "1.0.0",
+  "description": "database unit",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "MySQL Service",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "systemctl"
+  ]
+}

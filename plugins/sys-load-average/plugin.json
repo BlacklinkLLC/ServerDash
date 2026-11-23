@@ -1,0 +1,18 @@
+{
+  "id": "sys-load-average",
+  "name": "Load Average",
+  "version": "1.0.0",
+  "description": "1 minute",
+  "author": "Blacklink",
+  "icon": "Speedometer",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Load Average",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 60,
+      "wide": false
+    }
+  ]
+}

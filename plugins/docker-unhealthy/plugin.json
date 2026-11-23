@@ -1,0 +1,21 @@
+{
+  "id": "docker-unhealthy",
+  "name": "Unhealthy Containers",
+  "version": "1.0.0",
+  "description": "Failing health checks",
+  "author": "Blacklink",
+  "icon": "Warning",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Unhealthy Containers",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "docker"
+  ]
+}

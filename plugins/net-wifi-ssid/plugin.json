@@ -1,0 +1,21 @@
+{
+  "id": "net-wifi-ssid",
+  "name": "WiFi Network",
+  "version": "1.0.0",
+  "description": "Active SSID",
+  "author": "Blacklink",
+  "icon": "WiFi",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "WiFi Network",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "nmcli"
+  ]
+}

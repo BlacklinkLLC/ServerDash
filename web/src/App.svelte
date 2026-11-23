@@ -181,8 +181,8 @@
 		<nav>
 			<button class:active={page === 'dashboard'} onclick={() => (page = 'dashboard')}><Icon name="Home" size={14} /> Dashboard</button>
 			<button class:active={page === 'tools'} onclick={() => (page = 'tools')}><Icon name="Settings" size={14} /> Tools</button>
-			<button class:active={page === 'cluster'} onclick={() => (page = 'cluster')}><Icon name="Connect" size={14} /> Cluster</button>
-			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}><Icon name="Cloud" size={14} /> Kubernetes</button>
+			<button class:active={page === 'cluster'} onclick={() => (page = 'cluster')}><Icon name="Organization" size={14} /> Cluster</button>
+			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}><Icon name="Container" size={14} /> Kubernetes</button>
 			{#if !target}
 				<button class:active={page === 'plugins'} onclick={() => (page = 'plugins')}><Icon name="Puzzle" size={14} /> Plugins</button>
 			{/if}
@@ -193,7 +193,7 @@
 		</nav>
 		{#if cluster?.nodes?.length}
 			<label class="switcher" title="Choose which server to manage">
-				<Icon name="Desktop" size={14} />
+				<Icon name="Server" size={14} />
 				<select value={target ?? ''} onchange={(e) => openServer(e.currentTarget.value || null)}>
 					<option value="">{cluster.self?.hostname ?? 'This server'} (this server)</option>
 					{#each cluster.nodes as n (n.id)}

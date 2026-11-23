@@ -235,7 +235,7 @@
 							<button type="button" title="Move up" disabled={i === 0} onclick={() => move(i, -1)}>↑</button>
 							<button type="button" title="Move down" disabled={i === wf.blocks.length - 1} onclick={() => move(i, 1)}>↓</button>
 							<button type="button" title="Duplicate" onclick={() => duplicateBlock(i)}><Icon name="Copy" size={12} /></button>
-							<button type="button" title="Remove" onclick={() => removeBlock(i)}><Icon name="X" size={12} /></button>
+							<button type="button" title="Remove" onclick={() => removeBlock(i)}><Icon name="Trash" size={12} /></button>
 						</span>
 					</div>
 					{#if expanded.includes(i)}

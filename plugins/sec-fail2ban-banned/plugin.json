@@ -1,0 +1,21 @@
+{
+  "id": "sec-fail2ban-banned",
+  "name": "Banned IPs",
+  "version": "1.0.0",
+  "description": "fail2ban sshd bans",
+  "author": "Blacklink",
+  "icon": "Shield",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Banned IPs",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "fail2ban-client"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "sys-top-cpu",
+  "name": "Top CPU Process",
+  "version": "1.0.0",
+  "description": "Highest CPU consumer",
+  "author": "Blacklink",
+  "icon": "CPU",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Top CPU Process",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "store-backup-size",
+  "name": "Backup Size",
+  "version": "1.0.0",
+  "description": "Size of /var/backups",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Backup Size",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

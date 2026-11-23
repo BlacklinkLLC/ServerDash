@@ -1,0 +1,21 @@
+{
+  "id": "dev-ansible-version",
+  "name": "Ansible Version",
+  "version": "1.0.0",
+  "description": "Automation engine",
+  "author": "Blacklink",
+  "icon": "Script",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Ansible Version",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ansible"
+  ]
+}

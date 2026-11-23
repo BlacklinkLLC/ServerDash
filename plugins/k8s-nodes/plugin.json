@@ -1,0 +1,21 @@
+{
+  "id": "k8s-nodes",
+  "name": "Kubernetes Nodes",
+  "version": "1.0.0",
+  "description": "Cluster nodes",
+  "author": "Blacklink",
+  "icon": "Organization",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Kubernetes Nodes",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "kubectl"
+  ]
+}

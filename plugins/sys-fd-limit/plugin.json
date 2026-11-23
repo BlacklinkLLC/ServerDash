@@ -1,0 +1,18 @@
+{
+  "id": "sys-fd-limit",
+  "name": "Descriptor Limit",
+  "version": "1.0.0",
+  "description": "Per-process limit",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Descriptor Limit",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

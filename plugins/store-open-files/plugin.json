@@ -1,0 +1,21 @@
+{
+  "id": "store-open-files",
+  "name": "Open Files",
+  "version": "1.0.0",
+  "description": "Files held open",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Open Files",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "lsof"
+  ]
+}

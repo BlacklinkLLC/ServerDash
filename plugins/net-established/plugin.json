@@ -1,0 +1,21 @@
+{
+  "id": "net-established",
+  "name": "Established TCP",
+  "version": "1.0.0",
+  "description": "Active connections",
+  "author": "Blacklink",
+  "icon": "Connect",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Established TCP",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ss"
+  ]
+}

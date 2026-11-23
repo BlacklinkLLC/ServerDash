@@ -1,0 +1,21 @@
+{
+  "id": "k8s-pods",
+  "name": "Kubernetes Pods",
+  "version": "1.0.0",
+  "description": "Pods across namespaces",
+  "author": "Blacklink",
+  "icon": "Container",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Kubernetes Pods",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "kubectl"
+  ]
+}

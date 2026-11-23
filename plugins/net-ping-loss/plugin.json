@@ -1,0 +1,21 @@
+{
+  "id": "net-ping-loss",
+  "name": "Packet Loss",
+  "version": "1.0.0",
+  "description": "ICMP to 1.1.1.1",
+  "author": "Blacklink",
+  "icon": "Ethernet",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Packet Loss",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ping"
+  ]
+}

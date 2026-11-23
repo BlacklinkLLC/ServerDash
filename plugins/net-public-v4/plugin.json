@@ -1,0 +1,21 @@
+{
+  "id": "net-public-v4",
+  "name": "Public IPv4",
+  "version": "1.0.0",
+  "description": "External address",
+  "author": "Blacklink",
+  "icon": "Globe",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Public IPv4",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "curl"
+  ]
+}

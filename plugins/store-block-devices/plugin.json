@@ -1,0 +1,21 @@
+{
+  "id": "store-block-devices",
+  "name": "Block Devices",
+  "version": "1.0.0",
+  "description": "Detected block devices",
+  "author": "Blacklink",
+  "icon": "Server",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Block Devices",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "lsblk"
+  ]
+}

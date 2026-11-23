@@ -176,7 +176,7 @@
 					<p class="hint">Is this server part of a group? You can change this later on the Cluster page.</p>
 					<div class="choices">
 						<button type="button" class="choice" class:on={clusterChoice === 'standalone'} onclick={() => (clusterChoice = 'standalone')}>
-							<Icon name="Desktop" size={18} /><b>Standalone</b><span>Just this server</span>
+							<Icon name="Server" size={18} /><b>Standalone</b><span>Just this server</span>
 						</button>
 						<button type="button" class="choice" class:on={clusterChoice === 'primary'} onclick={() => (clusterChoice = 'primary')}>
 							<Icon name="Organization" size={18} /><b>Primary</b><span>Manage other servers from here</span>

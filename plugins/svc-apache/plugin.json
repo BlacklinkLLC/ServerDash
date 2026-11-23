@@ -1,0 +1,21 @@
+{
+  "id": "svc-apache",
+  "name": "Apache Service",
+  "version": "1.0.0",
+  "description": "web server unit",
+  "author": "Blacklink",
+  "icon": "Globe",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Apache Service",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "systemctl"
+  ]
+}

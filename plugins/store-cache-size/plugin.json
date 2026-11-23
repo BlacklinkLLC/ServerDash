@@ -1,0 +1,18 @@
+{
+  "id": "store-cache-size",
+  "name": "Cache Directory",
+  "version": "1.0.0",
+  "description": "Size of /var/cache",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Cache Directory",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

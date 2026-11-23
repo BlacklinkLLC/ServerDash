@@ -1,0 +1,18 @@
+{
+  "id": "sys-users-online",
+  "name": "Users Online",
+  "version": "1.0.0",
+  "description": "Logged in sessions",
+  "author": "Blacklink",
+  "icon": "Users",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Users Online",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

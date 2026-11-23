@@ -1,0 +1,18 @@
+{
+  "id": "sec-ssh-root",
+  "name": "Root SSH Logins",
+  "version": "1.0.0",
+  "description": "Successful root logins",
+  "author": "Blacklink",
+  "icon": "User",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Root SSH Logins",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

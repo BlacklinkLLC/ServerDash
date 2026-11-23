@@ -1,0 +1,21 @@
+{
+  "id": "dev-compose-version",
+  "name": "Compose Version",
+  "version": "1.0.0",
+  "description": "Docker Compose",
+  "author": "Blacklink",
+  "icon": "Stack",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Compose Version",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "docker"
+  ]
+}

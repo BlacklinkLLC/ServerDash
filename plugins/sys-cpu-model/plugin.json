@@ -1,0 +1,18 @@
+{
+  "id": "sys-cpu-model",
+  "name": "CPU Model",
+  "version": "1.0.0",
+  "description": "Processor",
+  "author": "Blacklink",
+  "icon": "CPU",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "CPU Model",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

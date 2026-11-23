@@ -1,0 +1,18 @@
+{
+  "id": "store-log-size",
+  "name": "Log Directory",
+  "version": "1.0.0",
+  "description": "Size of /var/log",
+  "author": "Blacklink",
+  "icon": "Document",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Log Directory",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

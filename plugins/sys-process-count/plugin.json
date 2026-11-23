@@ -1,0 +1,18 @@
+{
+  "id": "sys-process-count",
+  "name": "Processes",
+  "version": "1.0.0",
+  "description": "Running processes",
+  "author": "Blacklink",
+  "icon": "CPU",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Processes",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

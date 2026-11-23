@@ -1,0 +1,21 @@
+{
+  "id": "dev-java-version",
+  "name": "Java Version",
+  "version": "1.0.0",
+  "description": "JDK runtime",
+  "author": "Blacklink",
+  "icon": "Code",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Java Version",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "java"
+  ]
+}

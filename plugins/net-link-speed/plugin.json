@@ -1,0 +1,18 @@
+{
+  "id": "net-link-speed",
+  "name": "Link Speed",
+  "version": "1.0.0",
+  "description": "First NIC speed",
+  "author": "Blacklink",
+  "icon": "Ethernet",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Link Speed",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

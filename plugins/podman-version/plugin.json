@@ -1,0 +1,21 @@
+{
+  "id": "podman-version",
+  "name": "Podman Version",
+  "version": "1.0.0",
+  "description": "Podman version",
+  "author": "Blacklink",
+  "icon": "Container",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Podman Version",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "podman"
+  ]
+}

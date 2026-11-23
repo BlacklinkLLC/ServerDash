@@ -1,0 +1,21 @@
+{
+  "id": "sys-usb-count",
+  "name": "USB Devices",
+  "version": "1.0.0",
+  "description": "Attached USB devices",
+  "author": "Blacklink",
+  "icon": "Connect",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "USB Devices",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "lsusb"
+  ]
+}

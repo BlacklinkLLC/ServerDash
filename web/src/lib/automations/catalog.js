@@ -7,7 +7,7 @@ export const TRIGGERS = [
 	{ type: 'interval', label: 'Every N minutes', icon: 'Refresh', group: 'Schedule', hint: 'Repeating' },
 	{ type: 'cron', label: 'Cron', icon: 'Code', group: 'Schedule', hint: 'Custom expression' },
 	{ type: 'metric', label: 'Resource alert', icon: 'Speedometer', group: 'Event', hint: 'CPU, memory, disk, load' },
-	{ type: 'container', label: 'Container event', icon: 'Blocks', group: 'Event', hint: 'Stops or turns unhealthy' },
+	{ type: 'container', label: 'Container event', icon: 'Container', group: 'Event', hint: 'Stops or turns unhealthy' },
 	{ type: 'service', label: 'Service failure', icon: 'Warning', group: 'Event', hint: 'systemd unit fails' },
 	{ type: 'webhook', label: 'Webhook', icon: 'Connect', group: 'Other', hint: 'From CI, GitHub, anything' },
 	{ type: 'manual', label: 'Manual only', icon: 'Play', group: 'Other', hint: 'Run now button' },
@@ -75,7 +75,7 @@ export const BLOCKS = [
 			{ key: 'build', label: 'Rebuild images (--build)', kind: 'checkbox' },
 		],
 	},
-	{ type: 'prune', label: 'Prune unused Docker data', icon: 'Droplet', group: 'Containers', fields: [] },
+	{ type: 'prune', label: 'Prune unused Docker data', icon: 'Trash', group: 'Containers', fields: [] },
 	{ type: 'git_pull', label: 'Git pull', icon: 'Git', group: 'Deploy', fields: [{ key: 'dir', label: 'Repository directory', kind: 'text', placeholder: '/srv/app' }] },
 	{
 		type: 'shell',
@@ -101,7 +101,7 @@ export const BLOCKS = [
 	{
 		type: 'service_action',
 		label: 'Control a service',
-		icon: 'Settings',
+		icon: 'Server',
 		group: 'Server',
 		fields: [
 			{ key: 'action', label: 'Action', kind: 'select', options: [['restart', 'Restart'], ['start', 'Start'], ['stop', 'Stop'], ['reload', 'Reload']] },
@@ -167,7 +167,7 @@ export const TEMPLATES = [
 	},
 	{
 		name: 'Auto-heal crashed containers',
-		icon: 'Blocks',
+		icon: 'Container',
 		description: 'When a container stops or turns unhealthy, notify, wait, and restart it.',
 		trigger: { type: 'container', pattern: '*', event: 'either', cooldownMinutes: 10 },
 		blocks: [

@@ -140,7 +140,7 @@
 <section class="cluster">
 	<div class="head">
 		<div>
-			<h2><Icon name="Connect" size={20} /> Cluster</h2>
+			<h2><Icon name="Organization" size={20} /> Cluster</h2>
 			<p class="muted">
 				{#if m.mode === 'primary'}
 					This server is the <b>primary</b> · {online + 1} of {nodes.length + 1} servers online
@@ -152,7 +152,7 @@
 			</p>
 		</div>
 		{#if isAdmin && m.mode !== 'node'}
-			<button class="btn primary" onclick={() => ((adding = !adding), (token = null))}><Icon name="Upload" size={13} /> Add a server</button>
+			<button class="btn primary" onclick={() => ((adding = !adding), (token = null))}><Icon name="Plus" size={13} /> Add a server</button>
 		{/if}
 	</div>
 
@@ -164,7 +164,7 @@
 			<p class="muted">Create a single-use join token, then paste it into the new server's setup screen, or under <b>Cluster → Join a cluster</b> on an existing one.</p>
 			<div class="roles">
 				<button type="button" class="role" class:on={joinRole === 'node'} onclick={() => (joinRole = 'node')}>
-					<Icon name="Desktop" size={18} />
+					<Icon name="Server" size={18} />
 					<b>Node</b>
 					<span>Monitored and managed from here. Keeps its own users and settings.</span>
 				</button>
@@ -230,7 +230,7 @@
 					<span class="actions">
 						{#if isAdmin}
 							<button class="icon-btn" title="Edit" onclick={() => (editing = { id: n.id, name: n.name, url: n.url, role: n.role })}><Icon name="Edit" size={14} /></button>
-							<button class="icon-btn" title="Remove" onclick={() => (removing = n)}><Icon name="X" size={14} /></button>
+							<button class="icon-btn" title="Remove" onclick={() => (removing = n)}><Icon name="Trash" size={14} /></button>
 						{/if}
 						<button class="btn subtle" disabled={!n.url || !n.online} title={n.url ? '' : 'Set an address to manage it from here'} onclick={() => onopen?.(n.id)}>Open</button>
 					</span>

@@ -1,0 +1,21 @@
+{
+  "id": "net-ntp-offset",
+  "name": "NTP Offset",
+  "version": "1.0.0",
+  "description": "Clock offset",
+  "author": "Blacklink",
+  "icon": "Clock",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "NTP Offset",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "chronyc"
+  ]
+}

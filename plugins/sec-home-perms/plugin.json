@@ -1,0 +1,18 @@
+{
+  "id": "sec-home-perms",
+  "name": "Home Permissions",
+  "version": "1.0.0",
+  "description": "Mode of /home",
+  "author": "Blacklink",
+  "icon": "Home",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Home Permissions",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

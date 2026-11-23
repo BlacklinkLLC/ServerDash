@@ -1,0 +1,18 @@
+{
+  "id": "sys-swap-used",
+  "name": "Swap Used",
+  "version": "1.0.0",
+  "description": "Swap",
+  "author": "Blacklink",
+  "icon": "RAM",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Swap Used",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

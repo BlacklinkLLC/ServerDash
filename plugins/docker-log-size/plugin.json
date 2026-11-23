@@ -1,0 +1,18 @@
+{
+  "id": "docker-log-size",
+  "name": "Container Logs",
+  "version": "1.0.0",
+  "description": "Docker log storage",
+  "author": "Blacklink",
+  "icon": "Document",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Container Logs",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

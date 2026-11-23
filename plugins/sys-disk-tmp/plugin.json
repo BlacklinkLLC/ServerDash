@@ -1,0 +1,18 @@
+{
+  "id": "sys-disk-tmp",
+  "name": "Temp Disk",
+  "version": "1.0.0",
+  "description": "Filesystem /tmp",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Temp Disk",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 60,
+      "wide": false
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "store-largest-log",
+  "name": "Largest Log",
+  "version": "1.0.0",
+  "description": "Biggest log file",
+  "author": "Blacklink",
+  "icon": "Document",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Largest Log",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

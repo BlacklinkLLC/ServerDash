@@ -1,0 +1,18 @@
+{
+  "id": "sys-open-fds",
+  "name": "Open Descriptors",
+  "version": "1.0.0",
+  "description": "Allocated file handles",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Open Descriptors",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

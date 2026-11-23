@@ -1,0 +1,21 @@
+{
+  "id": "helm-releases",
+  "name": "Helm Releases",
+  "version": "1.0.0",
+  "description": "Installed charts",
+  "author": "Blacklink",
+  "icon": "Script",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Helm Releases",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "helm"
+  ]
+}

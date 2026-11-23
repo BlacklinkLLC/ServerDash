@@ -1,0 +1,21 @@
+{
+  "id": "dev-ssh-version",
+  "name": "OpenSSH Version",
+  "version": "1.0.0",
+  "description": "SSH client",
+  "author": "Blacklink",
+  "icon": "Key",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "OpenSSH Version",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ssh"
+  ]
+}

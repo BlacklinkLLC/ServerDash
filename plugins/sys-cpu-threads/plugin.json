@@ -1,0 +1,18 @@
+{
+  "id": "sys-cpu-threads",
+  "name": "CPU Threads",
+  "version": "1.0.0",
+  "description": "Active threads",
+  "author": "Blacklink",
+  "icon": "CPU",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "CPU Threads",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

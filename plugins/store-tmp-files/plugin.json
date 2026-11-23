@@ -1,0 +1,18 @@
+{
+  "id": "store-tmp-files",
+  "name": "Temp Files",
+  "version": "1.0.0",
+  "description": "Files directly in /tmp",
+  "author": "Blacklink",
+  "icon": "Trash",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Temp Files",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

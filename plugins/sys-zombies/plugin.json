@@ -1,0 +1,18 @@
+{
+  "id": "sys-zombies",
+  "name": "Zombie Processes",
+  "version": "1.0.0",
+  "description": "Defunct processes",
+  "author": "Blacklink",
+  "icon": "Warning",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Zombie Processes",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

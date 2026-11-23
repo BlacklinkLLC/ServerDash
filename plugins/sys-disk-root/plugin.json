@@ -1,0 +1,18 @@
+{
+  "id": "sys-disk-root",
+  "name": "Root Disk",
+  "version": "1.0.0",
+  "description": "Filesystem /",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Root Disk",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 60,
+      "wide": false
+    }
+  ]
+}

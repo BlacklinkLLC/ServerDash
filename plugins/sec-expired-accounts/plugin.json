@@ -1,0 +1,18 @@
+{
+  "id": "sec-expired-accounts",
+  "name": "Expired Accounts",
+  "version": "1.0.0",
+  "description": "Locked or expired",
+  "author": "Blacklink",
+  "icon": "Users",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Expired Accounts",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

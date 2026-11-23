@@ -1,0 +1,30 @@
+{
+  "id": "net-http-status",
+  "name": "HTTP Status",
+  "version": "1.0.0",
+  "description": "Target response code",
+  "author": "Blacklink",
+  "icon": "Globe",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "HTTP Status",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "curl"
+  ],
+  "settings": [
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "default": "https://example.com",
+      "help": "Checked with curl"
+    }
+  ]
+}

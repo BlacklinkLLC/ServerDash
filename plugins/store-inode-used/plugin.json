@@ -1,0 +1,18 @@
+{
+  "id": "store-inode-used",
+  "name": "Inodes Allocated",
+  "version": "1.0.0",
+  "description": "Used inodes",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Inodes Allocated",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

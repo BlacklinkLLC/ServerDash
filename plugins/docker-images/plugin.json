@@ -1,0 +1,21 @@
+{
+  "id": "docker-images",
+  "name": "Docker Images",
+  "version": "1.0.0",
+  "description": "Local images",
+  "author": "Blacklink",
+  "icon": "Container",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Docker Images",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "docker"
+  ]
+}

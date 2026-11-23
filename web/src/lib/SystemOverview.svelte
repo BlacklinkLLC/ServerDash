@@ -77,7 +77,7 @@
 				<span class="v">{snapshot ? snapshot.loadAvg1.toFixed(2) : '—'}</span>
 				<span class="sub">{snapshot ? `${snapshot.loadAvg5.toFixed(2)} · ${snapshot.loadAvg15.toFixed(2)}` : ''}</span>
 			</div>
-			<div><span class="k"><Icon name="Script" size={12} /> Processes</span><span class="v">{snapshot?.processCount ?? '—'}</span></div>
+			<div><span class="k"><Icon name="CPU" size={12} /> Processes</span><span class="v">{snapshot?.processCount ?? '—'}</span></div>
 			<div>
 				<span class="k"><Icon name="Globe" size={12} /> Network</span>
 				<span class="v small">↓ {formatRate(latest?.rx ?? 0)}</span>
@@ -118,12 +118,12 @@
 				</div>
 			{:else if w === 'cpuChart'}
 				<div class="panel span-half">
-					<div class="panel-title"><span class="pt"><Icon name="Speedometer" size={14} /> CPU usage</span> <span>{formatPercent(snapshot?.cpuPercent)}</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="CPU" size={14} /> CPU usage</span> <span>{formatPercent(snapshot?.cpuPercent)}</span></div>
 					<AreaChart points={history} series={[{ key: 'cpu', label: 'CPU', color: 'var(--accent)' }]} max={100} format={pctFmt} />
 				</div>
 			{:else if w === 'memChart'}
 				<div class="panel span-half">
-					<div class="panel-title"><span class="pt"><Icon name="Stack" size={14} /> Memory usage</span> <span>{formatPercent(snapshot?.memUsedPercent)}</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="RAM" size={14} /> Memory usage</span> <span>{formatPercent(snapshot?.memUsedPercent)}</span></div>
 					<AreaChart points={history} series={[{ key: 'mem', label: 'Memory', color: 'var(--accent)' }]} max={100} format={pctFmt} />
 				</div>
 			{:else if w === 'netChart'}
@@ -147,7 +147,7 @@
 				</div>
 			{:else if w === 'cores' && snapshot?.perCoreCpu?.length}
 				<div class="panel span-half">
-					<div class="panel-title"><span class="pt"><Icon name="Bolt" size={14} /> Per-core load</span> <span>{snapshot.cpuModel ?? ''}</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="CPU" size={14} /> Per-core load</span> <span>{snapshot.cpuModel ?? ''}</span></div>
 					<div class="cores">
 						{#each snapshot.perCoreCpu as c, i}
 							<div class="core" title="Core {i}: {c.toFixed(1)}%">
@@ -174,7 +174,7 @@
 				</div>
 			{:else if w === 'containers'}
 				<div class="panel span-half">
-					<div class="panel-title"><span class="pt"><Icon name="Blocks" size={14} /> Containers</span> <span>{containers.length} total</span></div>
+					<div class="panel-title"><span class="pt"><Icon name="Container" size={14} /> Containers</span> <span>{containers.length} total</span></div>
 					<div class="counts">
 						<div><span class="status-dot good"></span><b>{containerCounts.running}</b> running</div>
 						<div><span class="status-dot"></span><b>{containerCounts.stopped}</b> stopped</div>
@@ -190,7 +190,7 @@
 			{:else if w === 'processes' && processes}
 				<div class="panel span-half">
 					<div class="panel-title">
-						<span class="pt"><Icon name="Terminal" size={14} /> Top processes</span>
+						<span class="pt"><Icon name="CPU" size={14} /> Top processes</span>
 						<button class="link" onclick={() => onnavigate?.('tools')}>Open process manager →</button>
 					</div>
 					<table class="procs">

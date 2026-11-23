@@ -1,0 +1,21 @@
+{
+  "id": "dev-cmake-version",
+  "name": "CMake Version",
+  "version": "1.0.0",
+  "description": "Build generator",
+  "author": "Blacklink",
+  "icon": "Code",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "CMake Version",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "cmake"
+  ]
+}

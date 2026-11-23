@@ -1,0 +1,21 @@
+{
+  "id": "sec-certbot-count",
+  "name": "TLS Certificates",
+  "version": "1.0.0",
+  "description": "Managed certificates",
+  "author": "Blacklink",
+  "icon": "Lock",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "TLS Certificates",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "certbot"
+  ]
+}

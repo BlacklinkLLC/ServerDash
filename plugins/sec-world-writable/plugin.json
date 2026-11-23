@@ -1,0 +1,18 @@
+{
+  "id": "sec-world-writable",
+  "name": "World Writable Dirs",
+  "version": "1.0.0",
+  "description": "Risky directory modes",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "World Writable Dirs",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 86400,
+      "wide": true
+    }
+  ]
+}

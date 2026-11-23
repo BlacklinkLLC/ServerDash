@@ -1,0 +1,30 @@
+{
+  "id": "net-http-size",
+  "name": "HTTP Size",
+  "version": "1.0.0",
+  "description": "Downloaded bytes",
+  "author": "Blacklink",
+  "icon": "Download",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "HTTP Size",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "curl"
+  ],
+  "settings": [
+    {
+      "key": "url",
+      "label": "URL",
+      "type": "text",
+      "default": "https://example.com",
+      "help": "Checked with curl"
+    }
+  ]
+}

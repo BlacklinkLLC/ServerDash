@@ -1,0 +1,18 @@
+{
+  "id": "sys-boot-time",
+  "name": "Boot Time",
+  "version": "1.0.0",
+  "description": "Host boot timestamp",
+  "author": "Blacklink",
+  "icon": "Clock",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Boot Time",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "docker-restarts",
+  "name": "Container Restarts",
+  "version": "1.0.0",
+  "description": "Total restart count",
+  "author": "Blacklink",
+  "icon": "Refresh",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Container Restarts",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "docker"
+  ]
+}

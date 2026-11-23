@@ -1,0 +1,21 @@
+{
+  "id": "dev-npm-version",
+  "name": "npm Version",
+  "version": "1.0.0",
+  "description": "Package manager",
+  "author": "Blacklink",
+  "icon": "Script",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "npm Version",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "npm"
+  ]
+}

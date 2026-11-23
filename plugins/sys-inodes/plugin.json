@@ -1,0 +1,18 @@
+{
+  "id": "sys-inodes",
+  "name": "Inodes Used",
+  "version": "1.0.0",
+  "description": "Root filesystem",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Inodes Used",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

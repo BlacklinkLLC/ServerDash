@@ -1,0 +1,18 @@
+{
+  "id": "sec-ssh-failed",
+  "name": "Failed SSH Logins",
+  "version": "1.0.0",
+  "description": "Auth failures",
+  "author": "Blacklink",
+  "icon": "Warning",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Failed SSH Logins",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

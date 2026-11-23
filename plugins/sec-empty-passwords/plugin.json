@@ -1,0 +1,18 @@
+{
+  "id": "sec-empty-passwords",
+  "name": "Empty Passwords",
+  "version": "1.0.0",
+  "description": "Accounts without password",
+  "author": "Blacklink",
+  "icon": "Warning",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Empty Passwords",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

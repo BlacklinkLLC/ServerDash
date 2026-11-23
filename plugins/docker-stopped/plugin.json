@@ -1,0 +1,21 @@
+{
+  "id": "docker-stopped",
+  "name": "Docker Stopped",
+  "version": "1.0.0",
+  "description": "Exited containers",
+  "author": "Blacklink",
+  "icon": "Pause",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Docker Stopped",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "docker"
+  ]
+}

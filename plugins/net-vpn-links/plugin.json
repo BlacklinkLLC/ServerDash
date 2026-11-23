@@ -1,0 +1,21 @@
+{
+  "id": "net-vpn-links",
+  "name": "VPN Interfaces",
+  "version": "1.0.0",
+  "description": "Tunnel interfaces",
+  "author": "Blacklink",
+  "icon": "Encrypted",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "VPN Interfaces",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ip"
+  ]
+}

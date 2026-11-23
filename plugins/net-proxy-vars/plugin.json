@@ -1,0 +1,18 @@
+{
+  "id": "net-proxy-vars",
+  "name": "Proxy Variables",
+  "version": "1.0.0",
+  "description": "Configured proxy vars",
+  "author": "Blacklink",
+  "icon": "Settings",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Proxy Variables",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

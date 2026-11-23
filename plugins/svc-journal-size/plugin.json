@@ -1,0 +1,21 @@
+{
+  "id": "svc-journal-size",
+  "name": "Journal Size",
+  "version": "1.0.0",
+  "description": "Persisted logs",
+  "author": "Blacklink",
+  "icon": "Document",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Journal Size",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "journalctl"
+  ]
+}

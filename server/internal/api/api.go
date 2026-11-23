@@ -93,6 +93,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/runtime", s.handleRuntimeInfo)
 	mux.HandleFunc("GET /api/system/history", s.handleSystemHistory)
 	mux.HandleFunc("GET /api/host", s.handleHostInfo)
+	// Browsing the whole filesystem and opening a host shell are as powerful
+	// as Scripts, so both stay admin-only.
+	mux.HandleFunc("GET /api/files", auth.RequireRole(s.handleFileList, store.RoleAdmin))
+	mux.HandleFunc("GET /api/files/content", auth.RequireRole(s.handleFileContent, store.RoleAdmin))
+	mux.HandleFunc("GET /api/host/terminal", auth.RequireRole(s.handleHostTerminal, store.RoleAdmin))
 	// --- Host services / journal (native installs with systemd) ---
 	mux.HandleFunc("GET /api/services", auth.RequireRole(s.handleListServices, store.RoleAdmin, store.RoleOperator))
 	mux.HandleFunc("POST /api/services/{name}/{action}", auth.RequireRole(s.handleServiceAction, store.RoleAdmin))
@@ -137,6 +142,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/scripts/{id}", auth.RequireRole(s.handleDeleteScript, store.RoleAdmin))
 	mux.HandleFunc("POST /api/scripts/{id}/run", auth.RequireRole(s.handleRunScript, store.RoleAdmin))
 	mux.HandleFunc("GET /api/scripts/{id}/runs", auth.RequireRole(s.handleListScriptRuns, store.RoleAdmin))
+
+	// --- Test runner (admin) ---
+	mux.HandleFunc("POST /api/tests/run", auth.RequireRole(s.handleRunTest, store.RoleAdmin))
 
 	// --- Workflows: block-based scheduled deployment automations (admin) ---
 	mux.HandleFunc("GET /api/workflows", auth.RequireRole(s.handleListWorkflows, store.RoleAdmin))

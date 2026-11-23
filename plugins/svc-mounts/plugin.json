@@ -1,0 +1,21 @@
+{
+  "id": "svc-mounts",
+  "name": "Systemd Mounts",
+  "version": "1.0.0",
+  "description": "Mount units",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Systemd Mounts",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "systemctl"
+  ]
+}

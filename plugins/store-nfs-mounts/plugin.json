@@ -1,0 +1,18 @@
+{
+  "id": "store-nfs-mounts",
+  "name": "NFS Mounts",
+  "version": "1.0.0",
+  "description": "Network mounts",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "NFS Mounts",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

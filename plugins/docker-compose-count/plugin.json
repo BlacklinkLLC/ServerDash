@@ -1,0 +1,18 @@
+{
+  "id": "docker-compose-count",
+  "name": "Compose Projects",
+  "version": "1.0.0",
+  "description": "Compose files found",
+  "author": "Blacklink",
+  "icon": "Stack",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Compose Projects",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 1800,
+      "wide": false
+    }
+  ]
+}

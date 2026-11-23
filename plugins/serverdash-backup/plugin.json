@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Backs up ServerDash's own database (users, settings, workflows, scripts). Add the action to a scheduled workflow for nightly backups.",
   "author": "Blacklink",
-  "icon": "Save",
+  "icon": "Copy",
   "settings": [
     { "key": "keep", "label": "Backups to keep", "type": "number", "default": "7" }
   ],

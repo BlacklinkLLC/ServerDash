@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Shows how much space images, containers, volumes and build cache use, and frees it up.",
   "author": "Blacklink",
-  "icon": "Database",
+  "icon": "Folder",
   "requires": ["docker"],
   "widgets": [
     { "id": "usage", "title": "Docker disk usage", "format": "stats", "command": "sh ./usage.sh", "interval": 300 }

@@ -1,0 +1,18 @@
+{
+  "id": "sec-ssh-perms",
+  "name": "SSH Config Mode",
+  "version": "1.0.0",
+  "description": "sshd_config mode",
+  "author": "Blacklink",
+  "icon": "Key",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "SSH Config Mode",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "sys-os",
+  "name": "Operating System",
+  "version": "1.0.0",
+  "description": "Distribution",
+  "author": "Blacklink",
+  "icon": "Server",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Operating System",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

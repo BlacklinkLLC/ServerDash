@@ -1,0 +1,21 @@
+{
+  "id": "net-udp-sockets",
+  "name": "UDP Sockets",
+  "version": "1.0.0",
+  "description": "All UDP sockets",
+  "author": "Blacklink",
+  "icon": "Connect",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "UDP Sockets",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ss"
+  ]
+}

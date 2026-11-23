@@ -1,0 +1,18 @@
+{
+  "id": "sys-kernel",
+  "name": "Kernel",
+  "version": "1.0.0",
+  "description": "Running kernel",
+  "author": "Blacklink",
+  "icon": "Linux",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Kernel",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

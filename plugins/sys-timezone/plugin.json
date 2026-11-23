@@ -1,0 +1,18 @@
+{
+  "id": "sys-timezone",
+  "name": "Timezone",
+  "version": "1.0.0",
+  "description": "System timezone",
+  "author": "Blacklink",
+  "icon": "Clock",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Timezone",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

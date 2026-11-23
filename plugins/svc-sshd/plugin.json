@@ -1,0 +1,21 @@
+{
+  "id": "svc-sshd",
+  "name": "SSH Service",
+  "version": "1.0.0",
+  "description": "sshd unit",
+  "author": "Blacklink",
+  "icon": "Key",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "SSH Service",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "systemctl"
+  ]
+}

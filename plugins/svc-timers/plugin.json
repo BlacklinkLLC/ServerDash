@@ -1,0 +1,21 @@
+{
+  "id": "svc-timers",
+  "name": "Systemd Timers",
+  "version": "1.0.0",
+  "description": "Installed timers",
+  "author": "Blacklink",
+  "icon": "Clock",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Systemd Timers",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "systemctl"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "store-old-tmp",
+  "name": "Old Temp Files",
+  "version": "1.0.0",
+  "description": "Older than 7 days",
+  "author": "Blacklink",
+  "icon": "Trash",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Old Temp Files",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

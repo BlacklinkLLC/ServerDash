@@ -1,0 +1,18 @@
+{
+  "id": "sys-top-mem",
+  "name": "Top Memory Process",
+  "version": "1.0.0",
+  "description": "Highest memory consumer",
+  "author": "Blacklink",
+  "icon": "RAM",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Top Memory Process",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

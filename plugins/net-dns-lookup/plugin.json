@@ -1,0 +1,18 @@
+{
+  "id": "net-dns-lookup",
+  "name": "DNS Lookup",
+  "version": "1.0.0",
+  "description": "example.com address",
+  "author": "Blacklink",
+  "icon": "Globe",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "DNS Lookup",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

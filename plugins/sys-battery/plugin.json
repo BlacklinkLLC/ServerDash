@@ -1,0 +1,18 @@
+{
+  "id": "sys-battery",
+  "name": "Battery",
+  "version": "1.0.0",
+  "description": "Charge percentage",
+  "author": "Blacklink",
+  "icon": "Battery",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Battery",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

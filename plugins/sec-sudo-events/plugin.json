@@ -1,0 +1,18 @@
+{
+  "id": "sec-sudo-events",
+  "name": "Sudo Events",
+  "version": "1.0.0",
+  "description": "Privilege escalations",
+  "author": "Blacklink",
+  "icon": "Key",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Sudo Events",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

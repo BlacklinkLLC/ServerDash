@@ -1,0 +1,18 @@
+{
+  "id": "sec-shadow-mode",
+  "name": "Shadow Mode",
+  "version": "1.0.0",
+  "description": "shadow file mode",
+  "author": "Blacklink",
+  "icon": "Lock",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Shadow Mode",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

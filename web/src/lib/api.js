@@ -15,7 +15,7 @@ export class ApiError extends Error {
 // primary's proxy to that node. Everything else (auth, settings, admin)
 // always stays on the server you're signed in to. Mirrors the backend's
 // proxyablePrefixes.
-const proxyable = ['/api/system', '/api/runtime', '/api/host', '/api/containers', '/api/k8s', '/api/services', '/api/journal'];
+const proxyable = ['/api/system', '/api/runtime', '/api/host', '/api/containers', '/api/k8s', '/api/services', '/api/journal', '/api/files', '/api/tests'];
 let targetNode = null;
 
 export function setTargetNode(id) {
@@ -76,6 +76,10 @@ export const api = {
 	ports: () => request('/api/system/ports'),
 	interfaces: () => request('/api/system/interfaces'),
 	host: () => request('/api/host'),
+	files: (filePath) => request(`/api/files?path=${encodeURIComponent(filePath)}`),
+	fileContentUrl: (filePath, download = false) =>
+		route(`/api/files/content?path=${encodeURIComponent(filePath)}${download ? '&download=1' : ''}`),
+	hostTerminalSocketUrl: () => wsUrl('/api/host/terminal'),
 	services: () => request('/api/services'),
 	serviceAction: (name, action) => post(`/api/services/${encodeURIComponent(name)}/${action}`),
 	journal: (opts = {}) => {
@@ -124,6 +128,7 @@ export const api = {
 	deleteScript: (id) => del(`/api/scripts/${id}`),
 	runScript: (id) => post(`/api/scripts/${id}/run`),
 	scriptRuns: (id) => request(`/api/scripts/${id}/runs`),
+	runTest: (test) => post('/api/tests/run', test),
 
 	// --- Workflows: block-based deployment automations (admin) ---
 	workflows: () => request('/api/workflows'),

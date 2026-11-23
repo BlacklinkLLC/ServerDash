@@ -1,0 +1,18 @@
+{
+  "id": "store-dir-count",
+  "name": "Home Directories",
+  "version": "1.0.0",
+  "description": "Directories under /home",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Home Directories",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

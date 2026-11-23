@@ -1,0 +1,18 @@
+{
+  "id": "store-recent-logs",
+  "name": "Recent Log Files",
+  "version": "1.0.0",
+  "description": "Changed in last hour",
+  "author": "Blacklink",
+  "icon": "Document",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Recent Log Files",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 900,
+      "wide": false
+    }
+  ]
+}

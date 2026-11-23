@@ -1,0 +1,18 @@
+{
+  "id": "store-largest-home",
+  "name": "Largest Home",
+  "version": "1.0.0",
+  "description": "Biggest home folder",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Largest Home",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "net-default-gw",
+  "name": "Default Gateway",
+  "version": "1.0.0",
+  "description": "IPv4 gateway",
+  "author": "Blacklink",
+  "icon": "Connect",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Default Gateway",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ip"
+  ]
+}

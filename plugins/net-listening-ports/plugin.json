@@ -1,0 +1,21 @@
+{
+  "id": "net-listening-ports",
+  "name": "Listening Ports",
+  "version": "1.0.0",
+  "description": "TCP listeners",
+  "author": "Blacklink",
+  "icon": "Connect",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Listening Ports",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "ss"
+  ]
+}

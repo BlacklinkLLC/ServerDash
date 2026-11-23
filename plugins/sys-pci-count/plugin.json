@@ -1,0 +1,21 @@
+{
+  "id": "sys-pci-count",
+  "name": "PCI Devices",
+  "version": "1.0.0",
+  "description": "PCI bus devices",
+  "author": "Blacklink",
+  "icon": "Blocks",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "PCI Devices",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "lspci"
+  ]
+}

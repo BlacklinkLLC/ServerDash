@@ -1,0 +1,21 @@
+{
+  "id": "dev-node-version",
+  "name": "Node Version",
+  "version": "1.0.0",
+  "description": "JavaScript runtime",
+  "author": "Blacklink",
+  "icon": "Code",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Node Version",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "node"
+  ]
+}

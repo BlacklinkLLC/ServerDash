@@ -1,0 +1,18 @@
+{
+  "id": "sys-cpu-cores",
+  "name": "CPU Cores",
+  "version": "1.0.0",
+  "description": "Logical CPUs",
+  "author": "Blacklink",
+  "icon": "CPU",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "CPU Cores",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "store-file-count",
+  "name": "Home Files",
+  "version": "1.0.0",
+  "description": "Files under /home",
+  "author": "Blacklink",
+  "icon": "Folder",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Home Files",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

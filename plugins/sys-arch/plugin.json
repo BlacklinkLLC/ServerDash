@@ -1,0 +1,18 @@
+{
+  "id": "sys-arch",
+  "name": "Architecture",
+  "version": "1.0.0",
+  "description": "Machine architecture",
+  "author": "Blacklink",
+  "icon": "CPU",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Architecture",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ]
+}

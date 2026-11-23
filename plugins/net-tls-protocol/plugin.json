@@ -1,0 +1,37 @@
+{
+  "id": "net-tls-protocol",
+  "name": "TLS Protocol",
+  "version": "1.0.0",
+  "description": "Negotiated protocol",
+  "author": "Blacklink",
+  "icon": "Lock",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "TLS Protocol",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 3600,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "openssl"
+  ],
+  "settings": [
+    {
+      "key": "host",
+      "label": "Host",
+      "type": "text",
+      "default": "example.com",
+      "help": "Hostname or IP address"
+    },
+    {
+      "key": "port",
+      "label": "Port",
+      "type": "text",
+      "default": "443",
+      "help": "TCP port"
+    }
+  ]
+}

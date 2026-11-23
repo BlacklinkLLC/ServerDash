@@ -1,0 +1,30 @@
+{
+  "id": "net-whois-expiry",
+  "name": "Domain Expiry",
+  "version": "1.0.0",
+  "description": "Registration expiry",
+  "author": "Blacklink",
+  "icon": "Clock",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Domain Expiry",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 86400,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "whois"
+  ],
+  "settings": [
+    {
+      "key": "domain",
+      "label": "Domain",
+      "type": "text",
+      "default": "example.com",
+      "help": "Domain to look up"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "k8s-deployments",
+  "name": "Deployments",
+  "version": "1.0.0",
+  "description": "Deployments",
+  "author": "Blacklink",
+  "icon": "Stack",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Deployments",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "kubectl"
+  ]
+}

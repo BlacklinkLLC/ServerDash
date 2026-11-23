@@ -1,0 +1,21 @@
+{
+  "id": "docker-containers",
+  "name": "Docker Containers",
+  "version": "1.0.0",
+  "description": "All containers",
+  "author": "Blacklink",
+  "icon": "Container",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Docker Containers",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "docker"
+  ]
+}

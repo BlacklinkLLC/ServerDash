@@ -23,10 +23,15 @@ const maxRuntime = 10 * time.Minute
 // value, not err — err is reserved for failures to start the process at
 // all.
 func Run(ctx context.Context, content string) (exitCode int, output string, err error) {
+	return RunInDir(ctx, "", content)
+}
+
+func RunInDir(ctx context.Context, dir, content string) (exitCode int, output string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, maxRuntime)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", content)
+	cmd.Dir = dir
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf

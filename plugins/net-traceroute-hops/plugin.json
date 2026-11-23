@@ -1,0 +1,30 @@
+{
+  "id": "net-traceroute-hops",
+  "name": "Traceroute Hops",
+  "version": "1.0.0",
+  "description": "Hops to target",
+  "author": "Blacklink",
+  "icon": "Globe",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Traceroute Hops",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 1800,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "traceroute"
+  ],
+  "settings": [
+    {
+      "key": "host",
+      "label": "Host",
+      "type": "text",
+      "default": "example.com",
+      "help": "Hostname or IP address"
+    }
+  ]
+}

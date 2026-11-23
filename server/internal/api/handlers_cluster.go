@@ -27,7 +27,7 @@ import (
 // proxied request can never change a node's users or settings.
 var proxyablePrefixes = []string{
 	"/api/system", "/api/runtime", "/api/host", "/api/containers",
-	"/api/k8s", "/api/services", "/api/journal",
+	"/api/k8s", "/api/services", "/api/journal", "/api/files", "/api/tests",
 }
 
 func proxyable(path string) bool {

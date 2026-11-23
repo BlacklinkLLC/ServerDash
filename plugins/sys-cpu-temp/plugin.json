@@ -1,0 +1,21 @@
+{
+  "id": "sys-cpu-temp",
+  "name": "CPU Temperature",
+  "version": "1.0.0",
+  "description": "Thermal sensor",
+  "author": "Blacklink",
+  "icon": "Thermometer",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "CPU Temperature",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "sensors"
+  ]
+}

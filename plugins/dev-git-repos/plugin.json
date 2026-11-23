@@ -1,0 +1,21 @@
+{
+  "id": "dev-git-repos",
+  "name": "Git Repositories",
+  "version": "1.0.0",
+  "description": "Repos discovered",
+  "author": "Blacklink",
+  "icon": "Git",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Git Repositories",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 1800,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "git"
+  ]
+}

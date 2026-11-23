@@ -1,0 +1,18 @@
+{
+  "id": "net-dns-servers",
+  "name": "DNS Servers",
+  "version": "1.0.0",
+  "description": "Resolver addresses",
+  "author": "Blacklink",
+  "icon": "Globe",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "DNS Servers",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ]
+}

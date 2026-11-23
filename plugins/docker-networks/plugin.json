@@ -1,0 +1,21 @@
+{
+  "id": "docker-networks",
+  "name": "Docker Networks",
+  "version": "1.0.0",
+  "description": "Networks",
+  "author": "Blacklink",
+  "icon": "Connect",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Docker Networks",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "docker"
+  ]
+}

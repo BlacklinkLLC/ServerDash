@@ -3,8 +3,11 @@
 	import { api } from './api.js';
 	import { formatBytes } from './format.js';
 	import Icon from './Icon.svelte';
+	import TerminalView from './TerminalView.svelte';
 	import ServicesPanel from './tools/ServicesPanel.svelte';
 	import JournalViewer from './tools/JournalViewer.svelte';
+	import FileBrowser from './tools/FileBrowser.svelte';
+	import TestRunnerPanel from './tools/TestRunnerPanel.svelte';
 
 	let { isAdmin, refreshSeconds = 5, host = null } = $props();
 
@@ -85,11 +88,16 @@
 <section>
 	<h2><Icon name="Settings" size={20} /> Server tools</h2>
 	<nav class="tabs">
-		<button class:active={tab === 'processes'} onclick={() => (tab = 'processes')}><Icon name="Script" size={14} /> Processes</button>
+		<button class:active={tab === 'processes'} onclick={() => (tab = 'processes')}><Icon name="CPU" size={14} /> Processes</button>
 		<button class:active={tab === 'ports'} onclick={() => (tab = 'ports')}><Icon name="Connect" size={14} /> Listening ports</button>
 		<button class:active={tab === 'network'} onclick={() => (tab = 'network')}><Icon name="Ethernet" size={14} /> Network interfaces</button>
-		<button class:active={tab === 'services'} onclick={() => (tab = 'services')}><Icon name="Blocks" size={14} /> Services</button>
+		<button class:active={tab === 'services'} onclick={() => (tab = 'services')}><Icon name="Server" size={14} /> Services</button>
 		<button class:active={tab === 'logs'} onclick={() => (tab = 'logs')}><Icon name="Document" size={14} /> System logs</button>
+		{#if isAdmin}
+			<button class:active={tab === 'files'} onclick={() => (tab = 'files')}><Icon name="Folder" size={14} /> Files</button>
+			<button class:active={tab === 'terminal'} onclick={() => (tab = 'terminal')}><Icon name="Terminal" size={14} /> Host shell</button>
+			<button class:active={tab === 'tests'} onclick={() => (tab = 'tests')}><Icon name="Code" size={14} /> Tests</button>
+		{/if}
 	</nav>
 
 	{#if error}<p class="error">{error}</p>{/if}
@@ -183,6 +191,35 @@
 				</div>
 			{/each}
 		</div>
+	{:else if tab === 'files'}
+		{#if isAdmin}
+			<FileBrowser />
+		{:else}
+			<p class="muted">File browsing is available to administrators.</p>
+		{/if}
+	{:else if tab === 'terminal'}
+		{#if isAdmin}
+			{#if host?.deployment === 'container'}
+				<div class="panel note">
+					<Icon name="Information" size={18} />
+					<div>
+						<b>Container install</b>
+						<p class="muted">
+							The host shell changes root into <code>SERVERDASH_HOST_ROOT</code>. It needs a writable host mount and CAP_SYS_CHROOT; native installs open a shell directly.
+						</p>
+					</div>
+				</div>
+			{/if}
+			<TerminalView title="Host shell" socketUrl={api.hostTerminalSocketUrl()} onclose={() => (tab = 'processes')} />
+		{:else}
+			<p class="muted">The host shell is available to administrators.</p>
+		{/if}
+	{:else if tab === 'tests'}
+		{#if isAdmin}
+			<TestRunnerPanel />
+		{:else}
+			<p class="muted">The test runner is available to administrators.</p>
+		{/if}
 	{:else if tab === 'services' || tab === 'logs'}
 		{#if host && !host.systemd}
 			<div class="panel note">

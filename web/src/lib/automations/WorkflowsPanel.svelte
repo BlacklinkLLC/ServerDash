@@ -136,7 +136,7 @@
 	{#if picking || (!loading && workflows.length === 0)}
 		<div class="gallery">
 			<button class="tpl blank" onclick={() => fromTemplate(null)}>
-				<Icon name="Pencil" size={20} />
+				<Icon name="Plus" size={20} />
 				<b>Start from scratch</b>
 				<span>Pick a trigger and add steps yourself.</span>
 			</button>
@@ -183,7 +183,7 @@
 					<button class="btn subtle" onclick={() => (editing = normalize(wf))}><Icon name="Edit" size={12} /> Edit</button>
 					<button class="btn subtle" onclick={() => duplicate(wf)}><Icon name="Copy" size={12} /> Duplicate</button>
 					{#if wf.trigger?.type === 'webhook' && wf.trigger.token}
-						<button class="btn subtle" onclick={() => navigator.clipboard.writeText(api.workflowHookUrl(wf.trigger.token))}><Icon name="Connect" size={12} /> Copy webhook URL</button>
+						<button class="btn subtle" onclick={() => navigator.clipboard.writeText(api.workflowHookUrl(wf.trigger.token))}><Icon name="Copy" size={12} /> Copy webhook URL</button>
 					{/if}
 					<button class="btn danger" onclick={() => (confirmDelete = wf)}>Delete</button>
 				</div>

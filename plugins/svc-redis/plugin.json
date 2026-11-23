@@ -1,0 +1,21 @@
+{
+  "id": "svc-redis",
+  "name": "Redis Service",
+  "version": "1.0.0",
+  "description": "cache unit",
+  "author": "Blacklink",
+  "icon": "Stack",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Redis Service",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "systemctl"
+  ]
+}

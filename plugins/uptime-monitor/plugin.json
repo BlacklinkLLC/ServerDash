@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Checks that your websites and APIs respond, and how fast.",
   "author": "Blacklink",
-  "icon": "Activity",
+  "icon": "Speedometer",
   "requires": ["curl"],
   "settings": [
     { "key": "urls", "label": "URLs", "type": "textarea", "default": "https://nova.blacklink.net", "placeholder": "https://example.com\nhttp://192.168.1.10:8123", "help": "One per line." },

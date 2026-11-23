@@ -1,0 +1,21 @@
+{
+  "id": "docker-running",
+  "name": "Docker Running",
+  "version": "1.0.0",
+  "description": "Running containers",
+  "author": "Blacklink",
+  "icon": "Play",
+  "widgets": [
+    {
+      "id": "main",
+      "title": "Docker Running",
+      "format": "stats",
+      "command": "sh ./main.sh",
+      "interval": 300,
+      "wide": false
+    }
+  ],
+  "requires": [
+    "docker"
+  ]
+}

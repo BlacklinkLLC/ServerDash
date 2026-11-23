@@ -6,9 +6,9 @@
 	import RulesPanel from './RulesPanel.svelte';
 
 	const tabs = [
-		['workflows', 'Workflows', 'Lightning'],
+		['workflows', 'Workflows', 'Bolt'],
 		['activity', 'Activity', 'Clock'],
-		['scripts', 'Scripts', 'Code'],
+		['scripts', 'Scripts', 'Script'],
 		['rules', 'Built-in rules', 'Settings'],
 	];
 	let tab = $state('workflows');
