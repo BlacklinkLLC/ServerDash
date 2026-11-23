@@ -3,7 +3,9 @@
 	import Icon from '../Icon.svelte';
 
 	// One plugin widget: runs on the server, refreshed on the widget's interval.
-	let { plugin, widget } = $props();
+	let { plugin, widget, width = 'half' } = $props();
+
+	const widthClass = () => (width === 'full' ? 'span-full' : width === 'third' ? 'span-third' : 'span-half');
 	let res = $state(null);
 	let loading = $state(false);
 	let error = $state(null);
@@ -29,7 +31,7 @@
 	let problem = $derived(error || res?.error || null);
 </script>
 
-<div class="widget panel" class:wide={widget.wide}>
+<div class="widget panel {widthClass()}">
 	<header>
 		<span class="icon-wrap"><Icon name={plugin.icon || 'Puzzle'} size={14} /></span>
 		<b>{widget.title}</b>
@@ -84,8 +86,21 @@
 		gap: 10px;
 		min-width: 0;
 	}
-	.widget.wide {
-		grid-column: 1 / -1;
+	.span-full {
+		grid-column: span 6;
+	}
+	.span-half {
+		grid-column: span 3;
+	}
+	.span-third {
+		grid-column: span 2;
+	}
+	@media (max-width: 760px) {
+		.span-full,
+		.span-half,
+		.span-third {
+			grid-column: 1 / -1;
+		}
 	}
 	header {
 		display: flex;

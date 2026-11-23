@@ -1,8 +1,49 @@
 <script>
 	import { api } from '../api.js';
+	import { applyAppearance } from '../preferences.js';
 	import BrandLogo from '../BrandLogo.svelte';
 
 	let { branding, onbrandingchange } = $props();
+
+	const themes = [
+		{ id: 'dark', label: 'Dark', swatch: '#08080f' },
+		{ id: 'midnight', label: 'Midnight', swatch: '#050b18' },
+		{ id: 'terminal', label: 'Terminal', swatch: '#030503' },
+		{ id: 'light', label: 'Light', swatch: '#f4f4f8' },
+	];
+	const fonts = [
+		{ id: 'modern', label: 'Modern' },
+		{ id: 'classic', label: 'Classic' },
+		{ id: 'rounded', label: 'Rounded' },
+		{ id: 'mono', label: 'Monospace' },
+	];
+	const radii = [
+		{ id: 'sharp', label: 'Sharp' },
+		{ id: 'soft', label: 'Soft' },
+		{ id: 'default', label: 'Default' },
+		{ id: 'round', label: 'Round' },
+	];
+	const patterns = [
+		{ id: 'none', label: 'None' },
+		{ id: 'grid', label: 'Grid' },
+		{ id: 'dots', label: 'Dots' },
+		{ id: 'radiant', label: 'Radiant' },
+	];
+	const presets = ['#ffb020', '#55b5ff', '#65db93', '#b18cff', '#ff6f9c', '#ff7a45', '#2dd4bf'];
+
+	function initialWidgetItems() {
+		const catalog = branding?.widgetCatalog ?? [];
+		const source = branding?.widgetLayout?.length
+			? branding.widgetLayout
+			: (branding?.widgets ?? []).map((id) => ({ id, enabled: true, width: catalog.find((item) => item.id === id)?.width ?? 'half' }));
+		const items = source.map((item) => ({ ...item }));
+		for (const item of catalog) {
+			if (!items.some((existing) => existing.id === item.id)) {
+				items.push({ id: item.id, enabled: false, width: item.width || 'half' });
+			}
+		}
+		return items;
+	}
 
 	let appName = $state(branding?.appName ?? 'ServerDash');
 	let accentColor = $state(branding?.accentColor ?? '#ffb020');
@@ -10,55 +51,42 @@
 	let showContainers = $state(branding?.showContainers ?? true);
 	let theme = $state(branding?.theme ?? 'dark');
 	let density = $state(branding?.density ?? 'comfortable');
+	let fontFamily = $state(branding?.fontFamily ?? 'modern');
+	let borderRadius = $state(branding?.borderRadius ?? 'default');
+	let backgroundPattern = $state(branding?.backgroundPattern ?? 'none');
 	let refreshSeconds = $state(branding?.refreshSeconds ?? 5);
 	let warnThreshold = $state(branding?.warnThreshold ?? 75);
 	let critThreshold = $state(branding?.critThreshold ?? 90);
-	let footerText = $state(branding?.footerText ?? '');
+	let logoHeight = $state(branding?.logoHeight ?? 22);
+	let loginMessage = $state(branding?.loginMessage ?? 'Sign in to continue.');
+	let faviconFromLogo = $state(branding?.faviconFromLogo ?? true);
+	let widgetItems = $state(initialWidgetItems());
 
-	const widgetCatalog = {
-		health: 'Health banner (hostname, status, uptime, load, network)',
-		gauges: 'Resource gauges (CPU, memory, swap, fullest disk)',
-		cpuChart: 'CPU history chart',
-		memChart: 'Memory history chart',
-		netChart: 'Network throughput chart',
-		cores: 'Per-core CPU bars',
-		disks: 'Storage volumes',
-		containers: 'Container summary',
-		processes: 'Top processes (operators & admins)',
-	};
-	const themes = [
-		{ id: 'dark', label: 'Dark', swatch: '#08080f' },
-		{ id: 'midnight', label: 'Midnight', swatch: '#050b18' },
-		{ id: 'terminal', label: 'Terminal', swatch: '#030503' },
-		{ id: 'light', label: 'Light', swatch: '#f4f4f8' },
-	];
-	const presets = ['#ffb020', '#55b5ff', '#65db93', '#b18cff', '#ff6f9c', '#ff7a45', '#2dd4bf'];
-
-	// Enabled widgets in saved order, followed by disabled ones.
-	let enabled = $state([...(branding?.widgets ?? Object.keys(widgetCatalog))]);
-	let widgetOrder = $state([...enabled, ...Object.keys(widgetCatalog).filter((w) => !enabled.includes(w))]);
+	const catalog = $derived(Object.fromEntries((branding?.widgetCatalog ?? []).map((item) => [item.id, item.label])));
 
 	function move(i, delta) {
 		const j = i + delta;
-		if (j < 0 || j >= widgetOrder.length) return;
-		const next = [...widgetOrder];
+		if (j < 0 || j >= widgetItems.length) return;
+		const next = [...widgetItems];
 		[next[i], next[j]] = [next[j], next[i]];
-		widgetOrder = next;
-	}
-	function toggleWidget(w) {
-		enabled = enabled.includes(w) ? enabled.filter((x) => x !== w) : [...enabled, w];
+		widgetItems = next;
 	}
 
-	// Theme previews instantly; saving persists it for everyone.
 	$effect(() => {
-		document.documentElement.dataset.theme = theme;
-		document.documentElement.dataset.density = density;
-		// Leaving the tab without saving reverts to the saved look.
-		return () => {
-			document.documentElement.dataset.theme = branding?.theme ?? 'dark';
-			document.documentElement.dataset.density = branding?.density ?? 'comfortable';
-		};
+		applyAppearance({
+			...branding,
+			accentColor,
+			theme,
+			density,
+			fontFamily,
+			borderRadius,
+			backgroundPattern,
+			logoUrl: branding?.logoUrl,
+			faviconFromLogo: branding?.faviconFromLogo ?? true,
+		});
+		return () => applyAppearance(branding ?? {});
 	});
+
 	let error = $state(null);
 	let saving = $state(false);
 	let uploading = $state(false);
@@ -76,11 +104,16 @@
 				showContainers,
 				theme,
 				density,
+				fontFamily,
+				borderRadius,
+				backgroundPattern,
 				refreshSeconds: Number(refreshSeconds),
 				warnThreshold: Number(warnThreshold),
 				critThreshold: Number(critThreshold),
-				widgets: widgetOrder.filter((w) => enabled.includes(w)),
-				footerText,
+				logoHeight: Number(logoHeight),
+				loginMessage,
+				faviconFromLogo,
+				widgetLayout: widgetItems.map((item) => ({ id: item.id, enabled: item.enabled, width: item.width || 'half' })),
 			});
 			onbrandingchange?.(updated);
 		} catch (e) {
@@ -141,6 +174,10 @@
 			{#if branding?.logoUrl}
 				<button class="btn danger" onclick={removeLogo}>Remove</button>
 			{/if}
+			<label class="field">
+				Header logo height (px)
+				<input type="number" min="16" max="72" bind:value={logoHeight} class="short" />
+			</label>
 		</div>
 	</section>
 
@@ -184,8 +221,26 @@
 				</select>
 			</label>
 			<label class="field">
+				Font family
+				<select bind:value={fontFamily}>
+					{#each fonts as f (f.id)}<option value={f.id}>{f.label}</option>{/each}
+				</select>
+			</label>
+			<label class="field">
+				Corner radius
+				<select bind:value={borderRadius}>
+					{#each radii as r (r.id)}<option value={r.id}>{r.label}</option>{/each}
+				</select>
+			</label>
+			<label class="field">
+				Background
+				<select bind:value={backgroundPattern}>
+					{#each patterns as p (p.id)}<option value={p.id}>{p.label}</option>{/each}
+				</select>
+			</label>
+			<label class="field">
 				Refresh every (seconds)
-				<input type="number" min="2" max="300" bind:value={refreshSeconds} class="short" />
+				<input type="number" min="0.1" max="300" step="0.1" bind:value={refreshSeconds} class="short" />
 			</label>
 		</div>
 
@@ -202,11 +257,16 @@
 			</label>
 		</div>
 
-		<h3>Footer</h3>
+		<h3>Sign-in</h3>
 		<label class="field">
-			Footer text (blank uses the default)
-			<input bind:value={footerText} maxlength="200" placeholder="ServerDash by Blacklink Enterprise…" />
+			Sign-in message
+			<input bind:value={loginMessage} maxlength="200" placeholder="Sign in to continue." />
 		</label>
+		<label class="checkbox">
+			<input type="checkbox" bind:checked={faviconFromLogo} />
+			Use the uploaded logo as the favicon
+		</label>
+		<p class="muted">The ServerDash and Blacklink Enterprise footer credits are required and cannot be changed.</p>
 
 		<h3>Dashboard</h3>
 		<p class="muted">Choose which sections show on the main Dashboard page for everyone.</p>
@@ -219,18 +279,23 @@
 			Services (container list)
 		</label>
 
-		<h3>Overview widgets</h3>
-		<p class="muted">Toggle widgets and use the arrows to set the order they appear in.</p>
+		<h3>Dashboard widget layout</h3>
+		<p class="muted">Toggle widgets, choose their width, and use the arrows to set the order for everyone.</p>
 		<ul class="widgets">
-			{#each widgetOrder as w, i (w)}
-				<li class:off={!enabled.includes(w)}>
+			{#each widgetItems as item, i (item.id)}
+				<li class:off={!item.enabled}>
 					<label class="checkbox">
-						<input type="checkbox" checked={enabled.includes(w)} onchange={() => toggleWidget(w)} />
-						{widgetCatalog[w]}
+						<input type="checkbox" bind:checked={item.enabled} />
+						{catalog[item.id] ?? item.id}
 					</label>
+					<select bind:value={item.width} aria-label="Width for {item.id}">
+						<option value="full">Full width</option>
+						<option value="half">Half width</option>
+						<option value="third">Third width</option>
+					</select>
 					<span class="arrows">
 						<button type="button" class="btn subtle" disabled={i === 0} onclick={() => move(i, -1)} aria-label="Move up">↑</button>
-						<button type="button" class="btn subtle" disabled={i === widgetOrder.length - 1} onclick={() => move(i, 1)} aria-label="Move down">↓</button>
+						<button type="button" class="btn subtle" disabled={i === widgetItems.length - 1} onclick={() => move(i, 1)} aria-label="Move down">↓</button>
 					</span>
 				</li>
 			{/each}
@@ -411,5 +476,9 @@
 		opacity: 0;
 		cursor: pointer;
 		padding: 0;
+	}
+	.widgets li select {
+		font-size: 11px;
+		padding: 5px 8px;
 	}
 </style>

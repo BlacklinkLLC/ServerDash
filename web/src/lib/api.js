@@ -15,7 +15,7 @@ export class ApiError extends Error {
 // primary's proxy to that node. Everything else (auth, settings, admin)
 // always stays on the server you're signed in to. Mirrors the backend's
 // proxyablePrefixes.
-const proxyable = ['/api/system', '/api/runtime', '/api/host', '/api/containers', '/api/k8s', '/api/services', '/api/journal', '/api/files', '/api/tests'];
+const proxyable = ['/api/system', '/api/runtime', '/api/host', '/api/containers', '/api/managed-containers', '/api/images', '/api/k8s', '/api/services', '/api/journal', '/api/files', '/api/tests'];
 let targetNode = null;
 
 export function setTargetNode(id) {
@@ -97,6 +97,23 @@ export const api = {
 	deleteContainerNickname: (id) => del(`/api/containers/${id}/nickname`),
 	containerLogsSocketUrl: (id) => wsUrl(`/api/containers/${id}/logs`),
 	containerTerminalSocketUrl: (id) => wsUrl(`/api/containers/${id}/terminal`),
+	createContainer: (spec) => post('/api/containers/create', spec),
+	removeContainer: (id, force = true) => del(`/api/containers/${id}?force=${force}`),
+
+	// --- Docker/Podman images ---
+	images: () => request('/api/images'),
+	pullImage: (image) => post('/api/images/pull', { image }),
+	removeImage: (id, force = true) => del(`/api/images/${encodeURIComponent(id)}?force=${force}`),
+
+	// --- ServerDash Containers (native installs only) ---
+	managedContainers: () => request('/api/managed-containers'),
+	createManagedContainer: (spec) => post('/api/managed-containers', spec),
+	updateManagedContainer: (id, spec) => put(`/api/managed-containers/${encodeURIComponent(id)}`, spec),
+	deleteManagedContainer: (id, removeContainer = true) =>
+		del(`/api/managed-containers/${encodeURIComponent(id)}?removeContainer=${removeContainer}`),
+	deployManagedContainer: (id) => post(`/api/managed-containers/${encodeURIComponent(id)}/deploy`),
+	rollbackManagedContainer: (id) => post(`/api/managed-containers/${encodeURIComponent(id)}/rollback`),
+	managedContainerAction: (id, action) => post(`/api/managed-containers/${encodeURIComponent(id)}/${action}`),
 
 	// --- Kubernetes ---
 	k8sStatus: () => request('/api/k8s/status'),
@@ -115,6 +132,26 @@ export const api = {
 		del(`/api/k8s/pods/${namespace}/${name}/nickname${context ? `?context=${context}` : ''}`),
 	podLogsSocketUrl: (namespace, name, context) =>
 		wsUrl(`/api/k8s/pods/${namespace}/${name}/logs${context ? `?context=${context}` : ''}`),
+	k8sDeployments: (opts = {}) => {
+		const params = new URLSearchParams();
+		if (opts.context) params.set('context', opts.context);
+		if (opts.namespace) params.set('namespace', opts.namespace);
+		const qs = params.toString();
+		return request(`/api/k8s/deployments${qs ? `?${qs}` : ''}`);
+	},
+	k8sServices: (opts = {}) => {
+		const params = new URLSearchParams();
+		if (opts.context) params.set('context', opts.context);
+		if (opts.namespace) params.set('namespace', opts.namespace);
+		const qs = params.toString();
+		return request(`/api/k8s/services${qs ? `?${qs}` : ''}`);
+	},
+	scaleDeployment: (namespace, name, replicas, context) =>
+		post(`/api/k8s/deployments/${namespace}/${name}/scale?replicas=${replicas}${context ? `&context=${context}` : ''}`),
+	restartDeployment: (namespace, name, context) =>
+		post(`/api/k8s/deployments/${namespace}/${name}/restart${context ? `?context=${context}` : ''}`),
+	deletePod: (namespace, name, context) =>
+		del(`/api/k8s/pods/${namespace}/${name}${context ? `?context=${context}` : ''}`),
 
 	// --- Automation (admin) ---
 	automationRules: () => request('/api/automation/rules'),
@@ -160,6 +197,11 @@ export const api = {
 	joinCluster: (token, name, selfUrl) => post('/api/cluster/join', { token, name, selfUrl }),
 	leaveCluster: () => post('/api/cluster/leave'),
 	updateClusterSelf: (name, selfUrl) => put('/api/cluster/self', { name, selfUrl }),
+
+	// --- Personal preferences ---
+	preferences: () => request('/api/preferences'),
+	updatePreferences: (patch) => put('/api/preferences', patch),
+	resetPreferences: () => del('/api/preferences'),
 
 	// --- Settings / branding / appearance ---
 	settings: () => request('/api/settings'),

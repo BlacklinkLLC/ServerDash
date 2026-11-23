@@ -26,7 +26,7 @@ import (
 // settings, automation, and cluster endpoints always stay local, so a
 // proxied request can never change a node's users or settings.
 var proxyablePrefixes = []string{
-	"/api/system", "/api/runtime", "/api/host", "/api/containers",
+	"/api/system", "/api/runtime", "/api/host", "/api/containers", "/api/managed-containers", "/api/images",
 	"/api/k8s", "/api/services", "/api/journal", "/api/files", "/api/tests",
 }
 

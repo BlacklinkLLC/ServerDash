@@ -1,5 +1,6 @@
 # Go
 /server/serverdash
+/server/bin/
 /server/*.exe
 /server/*.db
 

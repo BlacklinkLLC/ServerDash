@@ -12,7 +12,10 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 )
 
 type Container struct {
@@ -194,6 +197,118 @@ type PruneReport struct {
 // the same scope as `docker system prune`, minus networks (rarely worth
 // the churn) and minus the --all image flag (keeps images backing any
 // stopped-but-not-removed container available for a quick restart).
+type PortSpec struct {
+	HostPort      string `json:"hostPort"`
+	ContainerPort string `json:"containerPort"`
+	Protocol      string `json:"protocol,omitempty"`
+}
+
+type CreateOptions struct {
+	Name          string            `json:"name"`
+	Image         string            `json:"image"`
+	Env           []string          `json:"env,omitempty"`
+	Ports         []PortSpec        `json:"ports,omitempty"`
+	Volumes       []string          `json:"volumes,omitempty"`
+	Command       []string          `json:"command,omitempty"`
+	RestartPolicy string            `json:"restartPolicy,omitempty"`
+	Labels        map[string]string `json:"labels,omitempty"`
+}
+
+// Create builds and starts a container from the Engine API. Callers validate
+// every field before reaching this point; this method only translates it.
+func (c *Client) Create(ctx context.Context, opts CreateOptions) (string, error) {
+	exposed := nat.PortSet{}
+	bindings := nat.PortMap{}
+	for _, p := range opts.Ports {
+		proto := strings.ToLower(strings.TrimSpace(p.Protocol))
+		if proto == "" {
+			proto = "tcp"
+		}
+		port, err := nat.NewPort(proto, strings.TrimSpace(p.ContainerPort))
+		if err != nil {
+			return "", fmt.Errorf("invalid container port %q: %w", p.ContainerPort, err)
+		}
+		exposed[port] = struct{}{}
+		bindings[port] = append(bindings[port], nat.PortBinding{HostIP: "", HostPort: strings.TrimSpace(p.HostPort)})
+	}
+
+	restart := strings.TrimSpace(opts.RestartPolicy)
+	if restart == "" {
+		restart = "unless-stopped"
+	}
+	cfg := &container.Config{
+		Image:        opts.Image,
+		Env:          opts.Env,
+		Cmd:          opts.Command,
+		ExposedPorts: exposed,
+		Labels:       opts.Labels,
+	}
+	hostCfg := &container.HostConfig{
+		Binds:        opts.Volumes,
+		PortBindings: bindings,
+		RestartPolicy: container.RestartPolicy{
+			Name: container.RestartPolicyMode(restart),
+		},
+	}
+	created, err := c.cli.ContainerCreate(ctx, cfg, hostCfg, &network.NetworkingConfig{}, nil, opts.Name)
+	if err != nil {
+		return "", fmt.Errorf("create container %s: %w", opts.Name, err)
+	}
+	if err := c.Start(ctx, created.ID); err != nil {
+		return created.ID, err
+	}
+	return created.ID, nil
+}
+
+// Remove deletes a container. Force stops it first when needed.
+func (c *Client) Remove(ctx context.Context, id string, force bool) error {
+	if err := c.cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: force, RemoveVolumes: true}); err != nil {
+		return fmt.Errorf("remove container %s: %w", id, err)
+	}
+	return nil
+}
+
+type Image struct {
+	ID      string   `json:"id"`
+	Tags    []string `json:"tags"`
+	Size    int64    `json:"size"`
+	Created int64    `json:"created"`
+}
+
+func (c *Client) ListImages(ctx context.Context) ([]Image, error) {
+	raw, err := c.cli.ImageList(ctx, image.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list images: %w", err)
+	}
+	out := make([]Image, 0, len(raw))
+	for _, item := range raw {
+		tags := append([]string(nil), item.RepoTags...)
+		out = append(out, Image{ID: item.ID, Tags: tags, Size: item.Size, Created: item.Created})
+	}
+	return out, nil
+}
+
+// PullImage downloads an image and drains the progress stream so the engine
+// isn't left with a blocked connection when the caller closes the response.
+func (c *Client) PullImage(ctx context.Context, ref string) error {
+	rc, err := c.cli.ImagePull(ctx, ref, image.PullOptions{})
+	if err != nil {
+		return fmt.Errorf("pull image %s: %w", ref, err)
+	}
+	defer rc.Close()
+	if _, err := io.Copy(io.Discard, rc); err != nil {
+		return fmt.Errorf("pull image %s: %w", ref, err)
+	}
+	return nil
+}
+
+func (c *Client) RemoveImage(ctx context.Context, id string, force bool) error {
+	if _, err := c.cli.ImageRemove(ctx, id, image.RemoveOptions{Force: force, PruneChildren: force}); err != nil {
+		return fmt.Errorf("remove image %s: %w", id, err)
+	}
+	return nil
+}
+
 func (c *Client) Prune(ctx context.Context) (PruneReport, error) {
 	var report PruneReport
 

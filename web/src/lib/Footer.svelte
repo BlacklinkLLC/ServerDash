@@ -5,9 +5,9 @@
 
 	const year = new Date().getFullYear();
 	const links = [
-		{ href: 'https://blacklink.net', label: 'Blacklink', icon: 'Globe' },
-		{ href: 'https://nova.blacklink.net', label: 'NOVA', icon: 'Brush' },
-		{ href: 'https://cdn.blacklink.net', label: 'CDN', icon: 'Cloud' },
+		{ label: 'Blacklink', url: 'https://blacklink.net', icon: 'Globe' },
+		{ label: 'NOVA', url: 'https://nova.blacklink.net', icon: 'Brush' },
+		{ label: 'CDN', url: 'https://cdn.blacklink.net', icon: 'Cloud' },
 	];
 </script>
 
@@ -20,17 +20,20 @@
 				<span class="wordmark"><Icon name="BlacklinkWordmark" size={110} /></span>
 			</a>
 			<p class="tagline">
-				<span class="product">{branding?.appName ?? 'ServerDash'}</span>
+				<span class="product">ServerDash</span>
+				{#if branding?.appName && branding.appName !== 'ServerDash'}
+					<span class="custom">for {branding.appName}</span>
+				{/if}
 				<span class="dot">·</span>
-				Built on <b>Blacklink Enterprise</b>
+				Built on Blacklink Enterprise
 			</p>
 		</div>
 
-		<nav class="links" aria-label="Blacklink">
-			{#each links as l (l.href)}
-				<a href={l.href} target="_blank" rel="noopener noreferrer">
-					<Icon name={l.icon} size={13} />
-					{l.label}
+		<nav class="links" aria-label="Blacklink links">
+			{#each links as link (link.url)}
+				<a href={link.url} target="_blank" rel="noopener noreferrer">
+					<Icon name={link.icon} size={13} />
+					{link.label}
 				</a>
 			{/each}
 		</nav>
@@ -40,9 +43,7 @@
 			Enterprise
 		</div>
 	</div>
-	<p class="legal">
-		{branding?.footerText || `ServerDash by Blacklink Enterprise. ©${year} Blacklink, Inc. All Rights Reserved.`}
-	</p>
+	<p class="legal">ServerDash by Blacklink Enterprise. ©{year} Blacklink, Inc. All Rights Reserved.</p>
 </footer>
 
 <style>
@@ -98,12 +99,12 @@
 		font-size: 11px;
 		color: var(--muted);
 	}
-	.tagline b {
-		color: var(--muted-strong);
-		font-weight: 500;
-	}
 	.product {
 		color: var(--accent);
+		font-weight: 600;
+	}
+	.custom {
+		color: var(--muted-strong);
 	}
 	.dot {
 		margin: 0 4px;

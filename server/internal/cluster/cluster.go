@@ -53,8 +53,10 @@ const (
 // ReplicatedSettings are the settings keys a replica mirrors. Node-local
 // keys (cluster_*, logo files) are deliberately excluded.
 var ReplicatedSettings = []string{
-	"app_name", "accent_color", "theme", "density", "refresh_seconds",
-	"warn_threshold", "crit_threshold", "overview_widgets", "footer_text",
+	"app_name", "accent_color", "theme", "density", "font_family", "border_radius",
+	"background_pattern", "refresh_seconds", "warn_threshold", "crit_threshold",
+	"overview_widgets", "widget_layout", "logo_height", "tagline", "login_message",
+	"show_brand_badge", "favicon_from_logo", "footer_text", "footer_links",
 	"dashboard_show_system", "dashboard_show_containers",
 }
 

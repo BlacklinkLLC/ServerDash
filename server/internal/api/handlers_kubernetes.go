@@ -1,8 +1,10 @@
 package api
 
 import (
+	"errors"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/websocket"
 
@@ -10,6 +12,8 @@ import (
 )
 
 const nicknameRuntimeK8s = "k8s"
+
+var errInvalidReplicas = errors.New("replicas must be a number between 0 and 1000")
 
 func (s *Server) handleK8sStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.kube.Status(r.Context()))
@@ -90,6 +94,66 @@ func (s *Server) handleK8sPodLogs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func (s *Server) handleK8sListDeployments(w http.ResponseWriter, r *http.Request) {
+	items, err := s.kube.ListDeployments(r.Context(), r.URL.Query().Get("context"), r.URL.Query().Get("namespace"))
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+func (s *Server) handleK8sListServices(w http.ResponseWriter, r *http.Request) {
+	items, err := s.kube.ListServices(r.Context(), r.URL.Query().Get("context"), r.URL.Query().Get("namespace"))
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+func (s *Server) handleK8sScaleDeployment(w http.ResponseWriter, r *http.Request) {
+	replicas, err := strconv.ParseInt(r.URL.Query().Get("replicas"), 10, 32)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, errInvalidReplicas)
+		return
+	}
+	err = s.kube.ScaleDeployment(
+		r.Context(),
+		r.URL.Query().Get("context"),
+		r.PathValue("namespace"),
+		r.PathValue("name"),
+		int32(replicas),
+	)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "scaled", "replicas": replicas})
+}
+
+func (s *Server) handleK8sRestartDeployment(w http.ResponseWriter, r *http.Request) {
+	err := s.kube.RestartDeployment(
+		r.Context(),
+		r.URL.Query().Get("context"),
+		r.PathValue("namespace"),
+		r.PathValue("name"),
+	)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "restarting"})
+}
+
+func (s *Server) handleK8sDeletePod(w http.ResponseWriter, r *http.Request) {
+	if err := s.kube.DeletePod(r.Context(), r.URL.Query().Get("context"), r.PathValue("namespace"), r.PathValue("name")); err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 func k8sNicknameKey(kubeContext, namespace, name string) string {

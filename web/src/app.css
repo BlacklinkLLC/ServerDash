@@ -87,6 +87,48 @@
 :root[data-density='compact'] table.token-table td {
 	padding: 6px 12px;
 }
+:root[data-font='classic'] {
+	--font-display: Georgia, 'Times New Roman', serif;
+	--font-sans: Georgia, 'Times New Roman', serif;
+}
+:root[data-font='rounded'] {
+	--font-display: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+	--font-sans: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+}
+:root[data-font='mono'] {
+	--font-display: var(--font-mono);
+	--font-sans: var(--font-mono);
+}
+:root[data-radius='sharp'] { --radius: 0px; }
+:root[data-radius='soft'] { --radius: 6px; }
+:root[data-radius='default'] { --radius: 13px; }
+:root[data-radius='round'] { --radius: 22px; }
+:root[data-radius='sharp'] .panel,
+:root[data-radius='sharp'] .btn,
+:root[data-radius='sharp'] input,
+:root[data-radius='sharp'] select,
+:root[data-radius='sharp'] textarea { border-radius: 2px; }
+:root[data-radius='soft'] .panel,
+:root[data-radius='soft'] .btn,
+:root[data-radius='soft'] input,
+:root[data-radius='soft'] select,
+:root[data-radius='soft'] textarea { border-radius: 6px; }
+:root[data-radius='round'] .panel,
+:root[data-radius='round'] .btn,
+:root[data-radius='round'] input,
+:root[data-radius='round'] select,
+:root[data-radius='round'] textarea { border-radius: 18px; }
+:root[data-pattern='grid'] body {
+	background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+	background-size: 32px 32px;
+}
+:root[data-pattern='dots'] body {
+	background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+	background-size: 22px 22px;
+}
+:root[data-pattern='radiant'] body {
+	background-image: radial-gradient(70% 60% at 50% 0%, var(--accent-soft), transparent 70%);
+}
 
 /* Shared panel used by overview widgets and tools. */
 .panel {

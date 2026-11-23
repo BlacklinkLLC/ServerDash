@@ -1,5 +1,6 @@
 <script>
 	import { api } from './api.js';
+	import { applyAccentColor } from './color.js';
 	import BrandLogo from './BrandLogo.svelte';
 	import Icon from './Icon.svelte';
 
@@ -38,7 +39,7 @@
 	];
 	$effect(() => {
 		document.documentElement.dataset.theme = theme;
-		document.documentElement.style.setProperty('--accent', accentColor);
+		applyAccentColor(accentColor);
 	});
 
 	// --- Cluster ---

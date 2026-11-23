@@ -28,10 +28,10 @@
 	<div class="center">
 		<form class="auth-card" onsubmit={submit}>
 			<div class="brand">
-				<BrandLogo {branding} size={32} />
+				<BrandLogo {branding} size={Math.max(28, (branding?.logoHeight ?? 22) * 1.5)} />
 				<h1>{branding?.appName ?? 'ServerDash'}</h1>
 			</div>
-			<p class="subtitle">Sign in to continue.</p>
+			<p class="subtitle">{branding?.loginMessage || 'Sign in to continue.'}</p>
 
 			{#if error}
 				<p class="error">{error}</p>
@@ -49,7 +49,7 @@
 			<button class="btn primary" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
 		</form>
 	</div>
-	<footer>ServerDash by Blacklink Enterprise. ©2026 Blacklink, Inc. All Rights Reserved.</footer>
+	<footer>{branding?.footerText || `${branding?.appName ?? 'ServerDash'} · ©${new Date().getFullYear()}`}</footer>
 </div>
 
 <style>

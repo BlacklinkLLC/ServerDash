@@ -1,11 +1,11 @@
 # ServerDash
 
-A self-hosted dashboard for monitoring your servers and managing the Docker, Podman, and Kubernetes workloads running on them. It ships as a single container, and Blacklink runs it at **nova.blacklink.net**.
+A self-hosted dashboard for monitoring your servers and managing the Docker, Podman, and Kubernetes workloads running on them. It ships as a single container, and Blacklink runs it at **server.blacklink.net**.
 
 - **Monitor** CPU, memory, load, and disk usage in real time.
-- **Control** containers and pods: start, stop, restart, stream logs, or open a shell.
+- **Control** containers and pods: create, deploy, start, stop, restart, stream logs, or open a shell.
 - **Automate** with scheduled tasks, shell scripts, and block-based deployment workflows.
-- **Make it yours**: name, logo, accent color, and visible sections are all configurable at runtime.
+- **Make it yours**: name, logo, accent color, density, dashboard widgets, and refresh speed are configurable globally or per user, while the required ServerDash/Blacklink footer branding stays fixed.
 
 The UI follows Blacklink's NOVA design system (dark, amber accent). The styles live in `web/src/app.css`.
 
@@ -14,10 +14,13 @@ The UI follows Blacklink's NOVA design system (dark, amber accent). The styles l
 - [Quick start](#quick-start)
 - [Installing on a server](#installing-on-a-server)
 - [Features](#features)
+- [Customization and preferences](#customization-and-preferences)
+- [ServerDash Containers](#serverdash-containers)
 - [Roles and first run](#roles-and-first-run)
 - [Configuration notes](#configuration-notes)
 - [Data persistence](#data-persistence)
 - [Workflows](#workflows)
+- [Plugins](#plugins)
 - [Self-update](#self-update)
 - [Web terminal](#web-terminal)
 - [Architecture](#architecture)
@@ -31,7 +34,7 @@ cp .env.example .env   # set SERVERDASH_PUBLIC_HOST, SERVERDASH_PORT, etc.
 docker compose up -d --build
 ```
 
-ServerDash will be available at `http://localhost:9900` (or whatever `SERVERDASH_PORT` is set to). Open it and create your administrator account to finish setup. For a real deployment, put it behind a reverse proxy (Blacklink uses **nova.blacklink.net**).
+ServerDash will be available at `http://localhost:9900` (or whatever `SERVERDASH_PORT` is set to). Open it and create your administrator account to finish setup. For a real deployment, put it behind a reverse proxy (Blacklink uses **server.blacklink.net**).
 
 ## Installing on a server
 
@@ -70,7 +73,7 @@ The interactive installer offers the same choice under "How should ServerDash ru
 - runs as the `serverdash` systemd service, reading settings from the same `.env` file and storing data in `/var/lib/serverdash`
 - turns on **Tools → Services** (start, stop, restart, enable, or disable systemd services and read their logs) and **Tools → System logs** (search and filter the system journal)
 
-Containers still work if Docker or Podman is installed. Without either, the container sections are simply hidden. `serverdash logs` follows the journal and `serverdash update` rebuilds and restarts. Re-running the installer on an existing native install keeps it native, and switching an existing container install to `--runtime native` stops the old container first; the `serverdash-data` volume isn't migrated automatically.
+Containers still work if Docker or Podman is installed. Native installs also unlock **ServerDash Containers**, which keep container definitions in ServerDash's own database and can deploy, restart, and roll them back. Without a container runtime, the container sections are simply hidden. `serverdash logs` follows the journal and `serverdash update` rebuilds and restarts; if the service fails to start, run `sudo ./fix.sh` from the checkout for the interactive ServerDash Doctor repair flow. Re-running the installer on an existing native install keeps it native, and switching an existing container install to `--runtime native` stops the old container first; the `serverdash-data` volume isn't migrated automatically.
 
 To run it by hand without the installer:
 
@@ -108,10 +111,13 @@ Removing a node revokes its secret; it keeps running standalone until it joins a
 - Process manager: search, sort, and stop or kill processes (admin)
 - Listening ports and network interfaces
 - systemd services and the system journal (native installs)
+- Admin-only filesystem browser, host PTY terminal, and saved-test runner
 
 **Containers and pods**
-- Docker and Podman: list containers, start/stop/restart, live log streaming, and an admin-only [web terminal](#web-terminal)
-- Kubernetes: list pods across contexts and namespaces, restart them (the pod is deleted and its controller recreates it), and stream logs
+- One **Containers** page that switches between Docker/Podman and Kubernetes, with the choice remembered in the browser
+- Docker and Podman: create and remove containers, pull/remove images, start/stop/restart, live log streaming, and an admin-only [web terminal](#web-terminal)
+- [ServerDash Containers](#serverdash-containers): persist container definitions, deploy them from images, and restart or roll them back (native installs only)
+- Kubernetes: list pods, deployments, and services across contexts and namespaces; scale or restart deployments, delete pods, and stream logs
 - Nicknames: give any container or pod a friendlier display name
 
 **Automation**
@@ -121,8 +127,28 @@ Removing a node revokes its secret; it keeps running standalone until it joins a
 
 **Administration**
 - Session-cookie login, forced first-run admin setup, and admin/operator/viewer roles
-- Appearance: rename the app, upload your own logo, pick an accent color, and choose which dashboard sections appear, all under Admin → Appearance and applied everywhere, including the sign-in screen
+- Global appearance: rename the app, upload your own logo, pick an accent color, set the 0.1s–300s refresh interval, and choose dashboard widgets under Admin → Appearance
+- Per-user preferences: theme, density, font, border radius, background pattern, refresh speed, and widget order, saved under the user's account
+- The ServerDash/Blacklink Enterprise footer is intentional and cannot be hidden or edited from settings
 - [Self-update](#self-update): check for upstream changes and redeploy from the Admin panel
+
+## Customization and preferences
+
+Admins configure global defaults under **Admin → Appearance**: app name, logo, accent color, theme, density, font, corner radius, background pattern, sign-in message, logo height, thresholds, refresh interval, and which widgets appear on the dashboard. The dashboard uses a sticky, grouped navigation bar that stays usable on narrow screens.
+
+Every signed-in user can override the look and feel under **Preferences**. User preferences are stored per account in SQLite and take precedence over global defaults; operators and viewers can change their own preferences even though they cannot edit global appearance.
+
+The refresh interval accepts fractions as small as `0.1` seconds. Unknown plugin widget IDs left in an old layout are ignored instead of breaking the dashboard, so a removed or renamed plugin doesn't lock you out.
+
+The footer is deliberately excluded from customization. It always shows ServerDash by Blacklink Enterprise, the Blacklink wordmark, the Enterprise badge, the default support links, and the current-year copyright line. Settings that try to change or hide it are ignored.
+
+## ServerDash Containers
+
+On native installs with Docker or Podman reachable locally, the **Containers** page adds a **Managed** tab. Managed containers are defined and stored in ServerDash's own SQLite database, so they survive ServerDash restarts and can be edited from the UI.
+
+A managed container records the image, environment variables, ports, volumes, command, and restart policy. From the UI an admin or operator can deploy, start, stop, restart, edit, delete, and manually roll back to a previous definition. Each deploy is recorded in the container's history.
+
+Managed containers are hidden on containerized ServerDash installs and when no Docker/Podman socket is available; ordinary Docker/Podman controls remain available.
 
 ## Roles and first run
 
@@ -150,7 +176,7 @@ On first start, with an empty database, every page redirects to a setup screen t
 
 ## Data persistence
 
-Everything ServerDash stores (users, sessions, nicknames, settings and branding, scripts, and workflows) lives in one SQLite file at `SERVERDASH_DB_PATH`, which defaults to `/data/serverdash.db` inside the container. An uploaded logo is stored next to it under `SERVERDASH_DATA_DIR`, which defaults to the same `/data`.
+Everything ServerDash stores (users, sessions, nicknames, settings and branding, user preferences, managed container definitions and deploy history, scripts, and workflows) lives in one SQLite file at `SERVERDASH_DB_PATH`, which defaults to `/data/serverdash.db` inside the container. An uploaded logo is stored next to it under `SERVERDASH_DATA_DIR`, which defaults to the same `/data`.
 
 `docker-compose.yml` keeps `/data` in a named volume, `serverdash-data`. Like any Docker volume, it survives `docker compose up -d --build`, image rebuilds, and `docker compose down` (without `-v`). Your data is lost only if you delete the volume or run ServerDash another way, such as plain `docker run`, without mounting a persistent path at `/data`.
 
@@ -195,9 +221,9 @@ Git's "dubious ownership" check, which would otherwise trigger because the conta
 
 ## Plugins
 
-The **Plugins** page adds widgets and tools to ServerDash. Each plugin is a folder with a `plugin.json` and a few shell scripts. Six ship with ServerDash: SSL certificates, Uptime monitor, Docker disk usage, Folder sizes, ServerDash backup, and Public IP.
+The **Plugins** page adds widgets and tools to ServerDash. Each plugin is a folder with a `plugin.json` and a few shell scripts; 148 plugin folders ship with ServerDash.
 
-All plugins start turned off. Under Plugins → Manage, an admin can turn one on, change its settings, and show its widgets on the dashboard. Plugin actions can also run from a workflow with the **Run plugin action** block.
+All plugins start turned off. Under Plugins → Manage, an admin can turn one on, change its settings, and show its widgets on the dashboard. Plugin actions can also run from a workflow with the **Run plugin action** block. Plugin widgets use the same width system as built-in widgets, and stale widget IDs are ignored if a plugin is later removed.
 
 Plugins run commands with ServerDash's own permissions, so only add plugins you trust. To write your own, see [plugins/README.md](plugins/README.md).
 
@@ -213,23 +239,24 @@ Your data is unaffected either way. See [Data persistence](#data-persistence).
 
 ## Web terminal
 
-Admins see a **Terminal** button on every running container in the Services list. It opens an interactive shell in the browser: xterm.js talking to the Engine API's exec/attach endpoints over WebSocket, with full PTY resize support. It tries `bash` first and falls back to `sh` for minimal images. It works with Podman containers unmodified, because it uses the same Engine API client as every other container control.
+Admins see a **Terminal** button on every running container in the Containers page. It opens an interactive shell in the browser: xterm.js talking to the Engine API's exec/attach endpoints over WebSocket, with full PTY resize support. It tries `bash` first and falls back to `sh` for minimal images. It works with Podman containers unmodified, because it uses the same Engine API client as every other container control.
 
 ## Architecture
 
 | Component | Stack | Role |
 | --- | --- | --- |
 | `server/` | Go | Backend and API |
-| `web/` | Svelte + Vite, served by Express | Dashboard UI; proxies `/api` (including WebSocket log and terminal streams) to the backend, so the browser talks to a single origin |
+| `web/` | Svelte + Vite, served by Express or the native Go binary | Dashboard UI; proxies `/api` (including WebSocket log and terminal streams) to the backend, so the browser talks to a single origin |
 | `install.sh` | Shell | Installs the runtime if needed, fetches ServerDash, and runs it as a systemd service |
 
 Both processes run in one container under `supervisord` (see `Dockerfile` and `docker/supervisord.conf`).
 
 **What the backend does:**
 - **Host metrics** (CPU, memory, load, disk) via gopsutil.
-- **Container control** through the Docker Engine API. Podman's socket is API-compatible, so the same client handles both. This also powers the web terminal.
-- **Kubernetes** pod listing, restart, and logs by shelling out to `kubectl`. This reuses whatever kubeconfig, contexts, and auth plugins you already have instead of reimplementing cluster auth.
-- **Storage** of auth (session cookies, bcrypt), users and roles, nicknames, automation rules, scripts, workflows, and settings in an embedded SQLite database (`internal/store`).
+- **Container control** through the Docker Engine API. Podman's socket is API-compatible, so the same client handles both. This also powers container creation/removal, image management, and the web terminal.
+- **ServerDash Containers** on native installs: managed definitions, deploy history, and rollback stored alongside the rest of ServerDash's data.
+- **Kubernetes** pods, deployments, services, scaling, restarts, and logs by shelling out to `kubectl`. This reuses whatever kubeconfig, contexts, and auth plugins you already have instead of reimplementing cluster auth.
+- **Storage** of auth (session cookies, bcrypt), users and roles, nicknames, automation rules, scripts, workflows, settings, user preferences, and managed container definitions in an embedded SQLite database (`internal/store`).
 - **Scheduling** of automation rules, scripts, and workflows through a cron runner (`internal/automation`), including per-workflow time zones.
 - **Workflows** via `internal/workflow`, the block-based deployment language described [above](#workflows).
 - **Self-update** via `internal/selfupdate`, described [above](#self-update).
@@ -257,7 +284,7 @@ Everything above is implemented. What follows is planned and **not built yet**.
 ### Service management
 - Container resource usage, uptime, exposed ports, mounted volumes, and image/version
 - Environment variables with secrets hidden
-- Pull/update images, recreate containers, and toggle automatic restart
+- Toggle automatic restart and recreate containers from saved definitions
 - Service dependencies and health checks
 
 ### Logs
@@ -266,14 +293,14 @@ Everything above is implemented. What follows is planned and **not built yet**.
 - Automatic detection of common errors
 
 ### Deployments
-- Deploy new services and update existing ones, from git or from images
-- Deployment history, status, and logs, plus scheduled deployments
-- Health verification after each deploy, with automatic rollback on failure, and manual rollback
+- Deploy new services and update existing ones from git repositories
+- Deployment status and logs, plus scheduled deployments
+- Health verification after each deploy and automatic rollback on failure (manual rollback is already supported)
 
 ### Server administration
-- SSH terminal, file browser, and file upload/download
+- SSH terminal and file upload/download (local file browsing and host terminal are already supported)
 - Service configuration editor and environment variable management
-- systemd service management, firewall status, network interfaces, and DNS configuration
+- Firewall status and DNS configuration (systemd service management and network interfaces are already supported)
 - Reboot/shutdown controls and package update status
 
 ### Networking

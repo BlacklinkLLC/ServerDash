@@ -112,10 +112,24 @@ func (s *Server) Routes() http.Handler {
 
 	// --- Containers (Docker/Podman) ---
 	mux.HandleFunc("GET /api/containers", s.handleListContainers)
+	mux.HandleFunc("POST /api/containers/create", auth.RequireRole(s.handleCreateContainer, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("DELETE /api/containers/{id}", auth.RequireRole(s.handleRemoveContainer, store.RoleAdmin))
 	mux.HandleFunc("POST /api/containers/{id}/start", auth.RequireRole(s.handleStart, store.RoleAdmin, store.RoleOperator))
 	mux.HandleFunc("POST /api/containers/{id}/stop", auth.RequireRole(s.handleStop, store.RoleAdmin, store.RoleOperator))
 	mux.HandleFunc("POST /api/containers/{id}/restart", auth.RequireRole(s.handleRestart, store.RoleAdmin, store.RoleOperator))
 	mux.HandleFunc("GET /api/containers/{id}/logs", s.handleLogs)
+	// --- ServerDash Containers (native installs only) ---
+	mux.HandleFunc("GET /api/managed-containers", auth.RequireRole(s.handleListManagedContainers, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("POST /api/managed-containers", auth.RequireRole(s.handleCreateManagedContainer, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("PUT /api/managed-containers/{id}", auth.RequireRole(s.handleUpdateManagedContainer, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("DELETE /api/managed-containers/{id}", auth.RequireRole(s.handleDeleteManagedContainer, store.RoleAdmin))
+	mux.HandleFunc("POST /api/managed-containers/{id}/deploy", auth.RequireRole(s.handleDeployManagedContainer, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("POST /api/managed-containers/{id}/rollback", auth.RequireRole(s.handleRollbackManagedContainer, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("POST /api/managed-containers/{id}/{action}", auth.RequireRole(s.handleManagedContainerAction, store.RoleAdmin, store.RoleOperator))
+	// --- Images (Docker/Podman) ---
+	mux.HandleFunc("GET /api/images", s.handleListImages)
+	mux.HandleFunc("POST /api/images/pull", auth.RequireRole(s.handlePullImage, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("DELETE /api/images/{id}", auth.RequireRole(s.handleRemoveImage, store.RoleAdmin))
 	mux.HandleFunc("PUT /api/containers/{id}/nickname", auth.RequireRole(s.handleSetContainerNickname, store.RoleAdmin, store.RoleOperator))
 	mux.HandleFunc("DELETE /api/containers/{id}/nickname", auth.RequireRole(s.handleDeleteContainerNickname, store.RoleAdmin, store.RoleOperator))
 	// A shell in a container is as powerful as Scripts (arbitrary code
@@ -125,6 +139,11 @@ func (s *Server) Routes() http.Handler {
 	// --- Kubernetes ---
 	mux.HandleFunc("GET /api/k8s/status", s.handleK8sStatus)
 	mux.HandleFunc("GET /api/k8s/pods", s.handleK8sListPods)
+	mux.HandleFunc("DELETE /api/k8s/pods/{namespace}/{name}", auth.RequireRole(s.handleK8sDeletePod, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("GET /api/k8s/deployments", s.handleK8sListDeployments)
+	mux.HandleFunc("POST /api/k8s/deployments/{namespace}/{name}/scale", auth.RequireRole(s.handleK8sScaleDeployment, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("POST /api/k8s/deployments/{namespace}/{name}/restart", auth.RequireRole(s.handleK8sRestartDeployment, store.RoleAdmin, store.RoleOperator))
+	mux.HandleFunc("GET /api/k8s/services", s.handleK8sListServices)
 	mux.HandleFunc("POST /api/k8s/pods/{namespace}/{name}/restart", auth.RequireRole(s.handleK8sRestartPod, store.RoleAdmin, store.RoleOperator))
 	mux.HandleFunc("GET /api/k8s/pods/{namespace}/{name}/logs", s.handleK8sPodLogs)
 	mux.HandleFunc("PUT /api/k8s/pods/{namespace}/{name}/nickname", auth.RequireRole(s.handleSetK8sNickname, store.RoleAdmin, store.RoleOperator))
@@ -176,6 +195,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/cluster/join", auth.RequireRole(s.handleClusterJoin, store.RoleAdmin))
 	mux.HandleFunc("POST /api/cluster/leave", auth.RequireRole(s.handleClusterLeave, store.RoleAdmin))
 	mux.HandleFunc("PUT /api/cluster/self", auth.RequireRole(s.handleClusterSelf, store.RoleAdmin))
+
+	// --- Personal preferences (any signed-in user) ---
+	mux.HandleFunc("GET /api/preferences", s.handleGetPreferences)
+	mux.HandleFunc("PUT /api/preferences", s.handleUpdatePreferences)
+	mux.HandleFunc("DELETE /api/preferences", s.handleResetPreferences)
 
 	// --- Settings / branding ---
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)

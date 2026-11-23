@@ -16,24 +16,13 @@ import (
 
 const (
 	defaultAppName    = "ServerDash"
-	defaultAccent     = "#ffb020" // NOVA's amber — matches app.css's --accent default
+	defaultAccent     = "#ffb020"
 	maxAppNameLength  = 60
-	maxLogoUploadSize = 2 << 20 // 2MB — plenty for a logo, small enough to not be a DoS vector
-)
-
-var (
-	validThemes    = map[string]bool{"dark": true, "midnight": true, "light": true, "terminal": true}
-	validDensities = map[string]bool{"comfortable": true, "compact": true}
-	// validWidgets are the overview's widget ids; the order an admin saves
-	// them in is the order they render.
-	validWidgets = []string{"health", "gauges", "cpuChart", "memChart", "netChart", "cores", "disks", "containers", "processes"}
-	maxFooterLen = 200
+	maxLogoUploadSize = 2 << 20
 )
 
 var accentColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
-// logoContentTypes maps accepted upload content types to the file
-// extension they're stored under.
 var logoContentTypes = map[string]string{
 	"image/png":     "png",
 	"image/jpeg":    "jpg",
@@ -46,23 +35,30 @@ func (s *Server) brandingDir() string {
 	return filepath.Join(s.cfg.DataDir, "branding")
 }
 
-// settingsResponse is what both the public GET /api/settings and the admin
-// PUT return: enough for the login/setup screens (unauthenticated) to
-// render the operator's branding before anyone has signed in, plus the
-// appearance/customization options the dashboard reads once signed in.
 type settingsResponse struct {
-	AppName        string   `json:"appName"`
-	LogoURL        *string  `json:"logoUrl,omitempty"`
-	AccentColor    string   `json:"accentColor"`
-	ShowSystem     bool     `json:"showSystem"`
-	ShowContainers bool     `json:"showContainers"`
-	Theme          string   `json:"theme"`
-	Density        string   `json:"density"`
-	RefreshSeconds int      `json:"refreshSeconds"`
-	WarnThreshold  int      `json:"warnThreshold"`
-	CritThreshold  int      `json:"critThreshold"`
-	Widgets        []string `json:"widgets"`
-	FooterText     string   `json:"footerText"`
+	AppName           string              `json:"appName"`
+	LogoURL           *string             `json:"logoUrl,omitempty"`
+	AccentColor       string              `json:"accentColor"`
+	Theme             string              `json:"theme"`
+	Density           string              `json:"density"`
+	FontFamily        string              `json:"fontFamily"`
+	BorderRadius      string              `json:"borderRadius"`
+	BackgroundPattern string              `json:"backgroundPattern"`
+	RefreshSeconds    float64             `json:"refreshSeconds"`
+	WarnThreshold     int                 `json:"warnThreshold"`
+	CritThreshold     int                 `json:"critThreshold"`
+	LogoHeight        int                 `json:"logoHeight"`
+	ShowSystem        bool                `json:"showSystem"`
+	ShowContainers    bool                `json:"showContainers"`
+	Widgets           []string            `json:"widgets"`
+	WidgetLayout      []widgetLayout      `json:"widgetLayout,omitempty"`
+	WidgetCatalog     []widgetCatalogItem `json:"widgetCatalog"`
+	FooterText        string              `json:"footerText"`
+	FooterLinks       []footerLink        `json:"footerLinks"`
+	Tagline           string              `json:"tagline"`
+	LoginMessage      string              `json:"loginMessage"`
+	ShowBrandBadge    bool                `json:"showBrandBadge"`
+	FaviconFromLogo   bool                `json:"faviconFromLogo"`
 }
 
 func settingString(s *Server, r *http.Request, key, def string) string {
@@ -81,41 +77,13 @@ func settingInt(s *Server, r *http.Request, key string, def int) int {
 	return def
 }
 
-func (s *Server) currentSettings(r *http.Request) settingsResponse {
-	appName := defaultAppName
-	if v, ok, _ := s.store.GetSetting(r.Context(), "app_name"); ok && v != "" {
-		appName = v
-	}
-	accent := defaultAccent
-	if v, ok, _ := s.store.GetSetting(r.Context(), "accent_color"); ok && v != "" {
-		accent = v
-	}
-
-	resp := settingsResponse{
-		AppName:        appName,
-		AccentColor:    accent,
-		ShowSystem:     settingBool(s, r, "dashboard_show_system", true),
-		ShowContainers: settingBool(s, r, "dashboard_show_containers", true),
-		Theme:          settingString(s, r, "theme", "dark"),
-		Density:        settingString(s, r, "density", "comfortable"),
-		RefreshSeconds: settingInt(s, r, "refresh_seconds", 5),
-		WarnThreshold:  settingInt(s, r, "warn_threshold", 75),
-		CritThreshold:  settingInt(s, r, "crit_threshold", 90),
-		Widgets:        validWidgets,
-		FooterText:     settingString(s, r, "footer_text", ""),
-	}
-	if v, ok, _ := s.store.GetSetting(r.Context(), "overview_widgets"); ok {
-		var ws []string
-		if json.Unmarshal([]byte(v), &ws) == nil {
-			resp.Widgets = ws
+func settingFloat(s *Server, r *http.Request, key string, def float64) float64 {
+	if v, ok, _ := s.store.GetSetting(r.Context(), key); ok {
+		if n, err := strconv.ParseFloat(v, 64); err == nil {
+			return n
 		}
 	}
-	if ext, ok, _ := s.store.GetSetting(r.Context(), "logo_ext"); ok && ext != "" {
-		version, _, _ := s.store.GetSetting(r.Context(), "logo_updated_at")
-		url := "/api/branding/logo?v=" + version
-		resp.LogoURL = &url
-	}
-	return resp
+	return def
 }
 
 func settingBool(s *Server, r *http.Request, key string, def bool) bool {
@@ -126,96 +94,58 @@ func settingBool(s *Server, r *http.Request, key string, def bool) bool {
 	return v == "true"
 }
 
+func (s *Server) currentSettings(r *http.Request) settingsResponse {
+	catalog := s.widgetCatalog(r)
+	widgets := append([]string(nil), builtinWidgetOrder...)
+	layout := s.currentWidgetLayout(r)
+	if len(layout) > 0 {
+		widgets = widgetLayoutIDs(layout)
+	} else if v, ok, _ := s.store.GetSetting(r.Context(), "overview_widgets"); ok {
+		var legacy []string
+		if json.Unmarshal([]byte(v), &legacy) == nil {
+			widgets = legacy
+		}
+	}
+
+	resp := settingsResponse{
+		AppName:           settingString(s, r, "app_name", defaultAppName),
+		AccentColor:       settingString(s, r, "accent_color", defaultAccent),
+		ShowSystem:        settingBool(s, r, "dashboard_show_system", true),
+		ShowContainers:    settingBool(s, r, "dashboard_show_containers", true),
+		Theme:             settingString(s, r, "theme", "dark"),
+		Density:           settingString(s, r, "density", "comfortable"),
+		FontFamily:        settingString(s, r, "font_family", defaultFontFamily),
+		BorderRadius:      settingString(s, r, "border_radius", defaultBorderRadius),
+		BackgroundPattern: settingString(s, r, "background_pattern", defaultBackgroundPattern),
+		RefreshSeconds:    settingFloat(s, r, "refresh_seconds", 5),
+		WarnThreshold:     settingInt(s, r, "warn_threshold", 75),
+		CritThreshold:     settingInt(s, r, "crit_threshold", 90),
+		LogoHeight:        settingInt(s, r, "logo_height", defaultLogoHeight),
+		Widgets:           widgets,
+		WidgetLayout:      layout,
+		WidgetCatalog:     sortedCatalog(catalog),
+		FooterText:        fmt.Sprintf("ServerDash by Blacklink Enterprise. ©%d Blacklink, Inc. All Rights Reserved.", time.Now().Year()),
+		FooterLinks:       defaultFooterLinks(),
+		Tagline:           "Built on Blacklink Enterprise",
+		LoginMessage:      settingString(s, r, "login_message", "Sign in to continue."),
+		ShowBrandBadge:    true,
+		FaviconFromLogo:   settingBool(s, r, "favicon_from_logo", true),
+	}
+	if ext, ok, _ := s.store.GetSetting(r.Context(), "logo_ext"); ok && ext != "" {
+		version, _, _ := s.store.GetSetting(r.Context(), "logo_updated_at")
+		url := "/api/branding/logo?v=" + version
+		resp.LogoURL = &url
+	}
+	return resp
+}
+
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.currentSettings(r))
-}
-
-type updateSettingsRequest struct {
-	AppName        string    `json:"appName"`
-	AccentColor    string    `json:"accentColor"`
-	ShowSystem     *bool     `json:"showSystem"`
-	ShowContainers *bool     `json:"showContainers"`
-	Theme          *string   `json:"theme"`
-	Density        *string   `json:"density"`
-	RefreshSeconds *int      `json:"refreshSeconds"`
-	WarnThreshold  *int      `json:"warnThreshold"`
-	CritThreshold  *int      `json:"critThreshold"`
-	Widgets        *[]string `json:"widgets"`
-	FooterText     *string   `json:"footerText"`
-}
-
-// validateAppearance checks the optional appearance fields and returns the
-// settings keys/values to persist, so nothing is written if any is invalid.
-func validateAppearance(req updateSettingsRequest) (map[string]string, error) {
-	out := map[string]string{}
-	if req.Theme != nil {
-		if !validThemes[*req.Theme] {
-			return nil, fmt.Errorf("unknown theme %q", *req.Theme)
-		}
-		out["theme"] = *req.Theme
-	}
-	if req.Density != nil {
-		if !validDensities[*req.Density] {
-			return nil, fmt.Errorf("unknown density %q", *req.Density)
-		}
-		out["density"] = *req.Density
-	}
-	if req.RefreshSeconds != nil {
-		if *req.RefreshSeconds < 2 || *req.RefreshSeconds > 300 {
-			return nil, errors.New("refresh interval must be between 2 and 300 seconds")
-		}
-		out["refresh_seconds"] = strconv.Itoa(*req.RefreshSeconds)
-	}
-	warn, crit := -1, -1
-	if req.WarnThreshold != nil {
-		warn = *req.WarnThreshold
-		out["warn_threshold"] = strconv.Itoa(warn)
-	}
-	if req.CritThreshold != nil {
-		crit = *req.CritThreshold
-		out["crit_threshold"] = strconv.Itoa(crit)
-	}
-	for _, t := range []int{warn, crit} {
-		if t != -1 && (t < 1 || t > 100) {
-			return nil, errors.New("thresholds must be between 1 and 100")
-		}
-	}
-	if warn != -1 && crit != -1 && warn >= crit {
-		return nil, errors.New("warning threshold must be below the critical threshold")
-	}
-	if req.Widgets != nil {
-		known := map[string]bool{}
-		for _, w := range validWidgets {
-			known[w] = true
-		}
-		seen := map[string]bool{}
-		for _, w := range *req.Widgets {
-			if !known[w] || seen[w] {
-				return nil, fmt.Errorf("unknown or duplicate widget %q", w)
-			}
-			seen[w] = true
-		}
-		b, _ := json.Marshal(*req.Widgets)
-		out["overview_widgets"] = string(b)
-	}
-	if req.FooterText != nil {
-		f := strings.TrimSpace(*req.FooterText)
-		if len(f) > maxFooterLen {
-			return nil, fmt.Errorf("footer text must be %d characters or fewer", maxFooterLen)
-		}
-		out["footer_text"] = f
-	}
-	return out, nil
 }
 
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req updateSettingsRequest
 	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	appearance, err := validateAppearance(req)
-	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
@@ -227,23 +157,30 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("app name must be %d characters or fewer", maxAppNameLength))
 		return
 	}
+	accent := strings.TrimSpace(req.AccentColor)
+	if accent != "" && !accentColorPattern.MatchString(accent) {
+		writeError(w, http.StatusBadRequest, errors.New("accent color must be a 6-digit hex code like #ffb020"))
+		return
+	}
+	appearance, err := validateAppearancePatch(req.appearancePatch(), s.widgetCatalog(r))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	for _, locked := range []string{"tagline", "footer_text", "footer_links", "show_brand_badge"} {
+		delete(appearance, locked)
+	}
+
 	if err := s.store.SetSetting(r.Context(), "app_name", name); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-
-	accent := strings.TrimSpace(req.AccentColor)
 	if accent != "" {
-		if !accentColorPattern.MatchString(accent) {
-			writeError(w, http.StatusBadRequest, errors.New("accent color must be a 6-digit hex code like #ffb020"))
-			return
-		}
 		if err := s.store.SetSetting(r.Context(), "accent_color", accent); err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
 		}
 	}
-
 	if req.ShowSystem != nil {
 		if err := s.store.SetSetting(r.Context(), "dashboard_show_system", strconv.FormatBool(*req.ShowSystem)); err != nil {
 			writeError(w, http.StatusInternalServerError, err)
@@ -256,7 +193,6 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
 	for k, v := range appearance {
 		if err := s.store.SetSetting(r.Context(), k, v); err != nil {
 			writeError(w, http.StatusInternalServerError, err)
@@ -329,9 +265,6 @@ func removeExistingLogo(dir string) {
 	}
 }
 
-// handleServeLogo is public (unauthenticated) so the setup and login
-// screens, which render before anyone can sign in, can show the operator's
-// branding.
 func (s *Server) handleServeLogo(w http.ResponseWriter, r *http.Request) {
 	ext, ok, err := s.store.GetSetting(r.Context(), "logo_ext")
 	if err != nil || !ok || ext == "" {

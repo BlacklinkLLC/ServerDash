@@ -20,6 +20,7 @@ func (s *Server) handleHostInfo(w http.ResponseWriter, r *http.Request) {
 		"deployment":        mode,
 		"systemd":           systemd.Available(),
 		"containersRuntime": dockerErr == nil,
+		"managedContainers": mode == "native" && dockerErr == nil,
 		"selfUpdate":        s.cfg.InstallDir != "",
 	})
 }

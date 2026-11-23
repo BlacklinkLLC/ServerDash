@@ -1,14 +1,14 @@
 <script>
 	import { onDestroy, onMount } from 'svelte';
 	import { api, setTargetNode } from './lib/api.js';
-	import { applyAccentColor } from './lib/color.js';
+	import { applyAppearance, mergeSettings, resolveWidgetLayout } from './lib/preferences.js';
 	import SystemOverview from './lib/SystemOverview.svelte';
 	import ContainerList from './lib/ContainerList.svelte';
-	import KubernetesView from './lib/KubernetesView.svelte';
+	import ContainersView from './lib/containers/ContainersView.svelte';
 	import ToolsView from './lib/ToolsView.svelte';
 	import ClusterView from './lib/ClusterView.svelte';
 	import PluginsView from './lib/plugins/PluginsView.svelte';
-	import DashboardPlugins from './lib/plugins/DashboardPlugins.svelte';
+	import PreferencesPanel from './lib/PreferencesPanel.svelte';
 	import AutomationsView from './lib/automations/AutomationsView.svelte';
 	import AdminPanel from './lib/admin/AdminPanel.svelte';
 	import SetupPage from './lib/SetupPage.svelte';
@@ -20,12 +20,16 @@
 	// 'loading' | 'setup' | 'login' | 'ready'
 	let authState = $state('loading');
 	let user = $state(null);
-	let branding = $state({ appName: 'ServerDash', logoUrl: null, accentColor: '#ffb020', showSystem: true, showContainers: true, refreshSeconds: 5, widgets: [] });
+	let globalSettings = $state({ appName: 'ServerDash', logoUrl: null, accentColor: '#ffb020', showSystem: true, showContainers: true, refreshSeconds: 5, widgets: [] });
+	let preferences = $state({});
+	let branding = $derived(mergeSettings(globalSettings, preferences));
+	let pluginWidgets = $state([]);
 	let runtime = $state(null);
 
-	const pages = ['dashboard', 'tools', 'kubernetes', 'cluster', 'plugins', 'automations', 'admin'];
+	const pages = ['dashboard', 'tools', 'containers', 'cluster', 'plugins', 'automations', 'admin', 'preferences'];
 	// The page lives in the URL hash so a refresh or shared link lands on it.
-	let page = $state(pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard');
+	const initialHash = location.hash.slice(1).replace('kubernetes', 'containers');
+	let page = $state(pages.includes(initialHash) ? initialHash : 'dashboard');
 	$effect(() => {
 		history.replaceState(null, '', `#${page}`);
 	});
@@ -63,19 +67,28 @@
 
 	async function loadBranding() {
 		try {
-			branding = await api.settings();
+			globalSettings = await api.settings();
 		} catch {
-			// Falls back to the default name/no logo — branding is cosmetic,
-			// never worth blocking the rest of the app over.
 		}
-		applyBranding();
 	}
 
-	function applyBranding() {
-		document.title = branding.appName;
-		applyAccentColor(branding.accentColor || '#ffb020');
-		document.documentElement.dataset.theme = branding.theme || 'dark';
-		document.documentElement.dataset.density = branding.density || 'comfortable';
+	async function loadPreferences() {
+		try {
+			preferences = await api.preferences();
+		} catch {
+			preferences = {};
+		}
+	}
+
+	async function loadPluginWidgets() {
+		try {
+			const result = await api.plugins();
+			pluginWidgets = result.plugins
+				.filter((p) => p.enabled && p.dashboard)
+				.flatMap((p) => (p.widgets ?? []).map((widget) => ({ id: `plugin:${p.id}:${widget.id}`, plugin: p, widget })));
+		} catch {
+			pluginWidgets = [];
+		}
 	}
 
 	async function resolveAuth() {
@@ -104,6 +117,8 @@
 	async function logout() {
 		await api.logout();
 		user = null;
+		preferences = {};
+		pluginWidgets = [];
 		page = 'dashboard';
 		authState = 'login';
 	}
@@ -142,6 +157,16 @@
 		await Promise.all([loadBranding(), resolveAuth()]);
 	});
 	$effect(() => {
+		branding;
+		applyAppearance(branding);
+	});
+	$effect(() => {
+		if (authState === 'ready') {
+			loadPreferences();
+			loadPluginWidgets();
+		}
+	});
+	$effect(() => {
 		if (authState === 'ready') {
 			page;
 			target;
@@ -159,10 +184,18 @@
 
 	let canOperate = $derived(user?.role === 'admin' || user?.role === 'operator');
 	let isAdmin = $derived(user?.role === 'admin');
+	let dashboardLayout = $derived(resolveWidgetLayout(branding, pluginWidgets));
 
 	function onBrandingChange(updated) {
-		branding = updated;
-		applyBranding();
+		globalSettings = updated;
+	}
+
+	function onPreferencesChange(updated) {
+		preferences = updated ?? {};
+	}
+
+	function onPreferencesReset() {
+		preferences = {};
 	}
 </script>
 
@@ -173,38 +206,46 @@
 {:else if authState === 'login'}
 	<LoginPage {branding} onready={onAuthed} />
 {:else}
-	<header>
+	<header class="topbar">
 		<div class="brand">
-			<BrandLogo {branding} size={22} />
-			<h1>{branding.appName}</h1>
+			<BrandLogo {branding} size={branding.logoHeight || 22} />
+			<div class="brand-copy">
+				<span class="eyebrow">Server dashboard</span>
+				<h1>{branding.appName}</h1>
+			</div>
 		</div>
-		<nav>
-			<button class:active={page === 'dashboard'} onclick={() => (page = 'dashboard')}><Icon name="Home" size={14} /> Dashboard</button>
-			<button class:active={page === 'tools'} onclick={() => (page = 'tools')}><Icon name="Settings" size={14} /> Tools</button>
-			<button class:active={page === 'cluster'} onclick={() => (page = 'cluster')}><Icon name="Organization" size={14} /> Cluster</button>
-			<button class:active={page === 'kubernetes'} onclick={() => (page = 'kubernetes')}><Icon name="Container" size={14} /> Kubernetes</button>
+		<nav class="primary-nav" aria-label="Primary">
+			<button class:active={page === 'dashboard'} title="Dashboard" onclick={() => (page = 'dashboard')}><Icon name="Home" size={14} /> <span>Dashboard</span></button>
+			<button class:active={page === 'tools'} title="Tools" onclick={() => (page = 'tools')}><Icon name="Settings" size={14} /> <span>Tools</span></button>
+			<button class:active={page === 'containers'} title="Containers" onclick={() => (page = 'containers')}><Icon name="Container" size={14} /> <span>Containers</span></button>
+			<button class:active={page === 'cluster'} title="Cluster" onclick={() => (page = 'cluster')}><Icon name="Organization" size={14} /> <span>Cluster</span></button>
 			{#if !target}
-				<button class:active={page === 'plugins'} onclick={() => (page = 'plugins')}><Icon name="Puzzle" size={14} /> Plugins</button>
+				<button class:active={page === 'plugins'} title="Plugins" onclick={() => (page = 'plugins')}><Icon name="Puzzle" size={14} /> <span>Plugins</span></button>
 			{/if}
+			<button class:active={page === 'preferences'} title="Preferences" onclick={() => (page = 'preferences')}><Icon name="Brush" size={14} /> <span>Preferences</span></button>
 			{#if isAdmin && !target}
-				<button class:active={page === 'automations'} onclick={() => (page = 'automations')}><Icon name="Bolt" size={14} /> Automations</button>
-				<button class:active={page === 'admin'} onclick={() => (page = 'admin')}><Icon name="Shield" size={14} /> Admin</button>
+				<span class="nav-divider" aria-hidden="true"></span>
+				<button class:active={page === 'automations'} title="Automations" onclick={() => (page = 'automations')}><Icon name="Bolt" size={14} /> <span>Automations</span></button>
+				<button class:active={page === 'admin'} title="Admin" onclick={() => (page = 'admin')}><Icon name="Shield" size={14} /> <span>Admin</span></button>
 			{/if}
 		</nav>
-		{#if cluster?.nodes?.length}
-			<label class="switcher" title="Choose which server to manage">
-				<Icon name="Server" size={14} />
-				<select value={target ?? ''} onchange={(e) => openServer(e.currentTarget.value || null)}>
-					<option value="">{cluster.self?.hostname ?? 'This server'} (this server)</option>
-					{#each cluster.nodes as n (n.id)}
-						<option value={n.id} disabled={!n.online || !n.url}>{n.name}{n.online ? '' : ' (offline)'}{n.url ? '' : ' (no address)'}</option>
-					{/each}
-				</select>
-			</label>
-		{/if}
-		<div class="user">
-			<span class="who"><Icon name="User" size={14} /> {user.username} <span class="muted">({user.role})</span></span>
-			<button class="btn subtle signout" onclick={logout}><Icon name="Exit" size={13} /> Sign out</button>
+		<div class="topbar-actions">
+			{#if cluster?.nodes?.length}
+				<label class="switcher" title="Choose which server to manage">
+					<Icon name="Server" size={14} />
+					<select value={target ?? ''} onchange={(e) => openServer(e.currentTarget.value || null)}>
+						<option value="">{cluster.self?.hostname ?? 'This server'} (this server)</option>
+						{#each cluster.nodes as n (n.id)}
+							<option value={n.id} disabled={!n.online || !n.url}>{n.name}{n.online ? '' : ' (offline)'}{n.url ? '' : ' (no address)'}</option>
+						{/each}
+					</select>
+				</label>
+			{/if}
+			<div class="user">
+				<span class="avatar"><Icon name="User" size={14} /></span>
+				<span class="who"><b>{user.username}</b><small>{user.role}</small></span>
+				<button class="btn subtle signout" title="Sign out" onclick={logout}><Icon name="Exit" size={13} /> <span>Sign out</span></button>
+			</div>
 		</div>
 	</header>
 
@@ -228,11 +269,12 @@
 					history={metricsHistory}
 					{containers}
 					processes={topProcesses}
-					settings={host?.containersRuntime === false ? { ...branding, widgets: (branding.widgets ?? []).filter((w) => w !== 'containers') } : branding}
+					settings={branding}
+					widgetLayout={host?.containersRuntime === false ? dashboardLayout.filter((item) => item.id !== 'containers') : dashboardLayout}
+					{pluginWidgets}
 					onnavigate={(p) => (page = p)}
 				/>
 			{/if}
-			{#if !target}<DashboardPlugins version={pluginsVersion} />{/if}
 			{#if branding.showContainers && host?.containersRuntime !== false}
 				<ContainerList {containers} {canOperate} {isAdmin} onaction={refresh} />
 			{/if}
@@ -249,12 +291,14 @@
 				}}
 				onchange={loadCluster}
 			/>
-		{:else if page === 'kubernetes'}
-			<KubernetesView {canOperate} />
+		{:else if page === 'containers'}
+			<ContainersView {containers} {canOperate} {isAdmin} {host} onaction={refresh} />
 		{:else if page === 'plugins'}
-			<PluginsView {isAdmin} onchange={() => pluginsVersion++} />
+			<PluginsView {isAdmin} onchange={() => { pluginsVersion++; loadPluginWidgets(); }} />
 		{:else if page === 'automations'}
 			<AutomationsView />
+		{:else if page === 'preferences'}
+			<PreferencesPanel {branding} onpreferences={onPreferencesChange} onreset={onPreferencesReset} />
 		{:else if page === 'admin'}
 			<AdminPanel currentUserId={user.id} {branding} onbrandingchange={onBrandingChange} />
 		{/if}
@@ -273,51 +317,98 @@
 	.muted {
 		color: var(--muted);
 	}
-	header {
-		display: flex;
+	.topbar {
+		position: sticky;
+		top: 0;
+		z-index: 20;
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
 		align-items: center;
-		gap: 24px;
-		padding: 16px 24px;
+		gap: 18px;
+		padding: 11px 24px;
 		border-bottom: 1px solid var(--border);
 		background: var(--surface);
 	}
 	.brand {
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: 11px;
+		min-width: 0;
+	}
+	.brand-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
+	}
+	.eyebrow {
+		font-size: 9px;
+		font-weight: 600;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--muted);
 	}
 	h1 {
+		max-width: 220px;
 		margin: 0;
-		font-size: 17px;
+		font-size: 16px;
 		letter-spacing: -0.01em;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
-	nav {
+	.primary-nav {
 		display: flex;
-		gap: 4px;
-		flex: 1;
+		align-items: center;
+		gap: 3px;
+		min-width: 0;
+		padding: 3px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: var(--sur2);
+		overflow-x: auto;
+		scrollbar-width: none;
 	}
-	nav button {
+	.primary-nav::-webkit-scrollbar {
+		display: none;
+	}
+	.primary-nav button {
 		display: inline-flex;
 		align-items: center;
 		gap: 7px;
+		flex: 0 0 auto;
+		white-space: nowrap;
 		background: none;
 		border: none;
-		border-radius: 10px;
-		padding: 7px 14px;
+		border-radius: 9px;
+		padding: 8px 12px;
 		font-family: var(--font-sans);
 		font-size: 12px;
 		color: var(--muted);
+		transition:
+			background 0.15s ease,
+			color 0.15s ease;
 	}
-	nav button.active {
+	.primary-nav button:hover {
+		background: rgba(255, 255, 255, 0.04);
+		color: var(--text);
+	}
+	.primary-nav button.active {
 		background: var(--accent-soft);
 		color: var(--accent);
 		font-weight: 500;
+		box-shadow: inset 0 0 0 1px var(--border-strong);
 	}
-	.who,
-	.signout {
-		display: inline-flex;
+	.nav-divider {
+		width: 1px;
+		height: 20px;
+		margin: 0 4px;
+		background: var(--border2);
+	}
+	.topbar-actions {
+		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: 12px;
 	}
 	.switcher {
 		display: inline-flex;
@@ -326,9 +417,74 @@
 		color: var(--muted);
 	}
 	.switcher select {
+		max-width: 190px;
 		padding: 7px 10px;
 		font-size: 12px;
 		border-radius: 10px;
+	}
+	.user {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		font-size: 12px;
+	}
+	.avatar {
+		width: 30px;
+		height: 30px;
+		display: grid;
+		place-items: center;
+		border-radius: 50%;
+		border: 1px solid var(--border-strong);
+		background: var(--accent-soft);
+		color: var(--accent);
+	}
+	.who {
+		display: flex;
+		flex-direction: column;
+		line-height: 1.15;
+	}
+	.who b {
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.who small {
+		font-size: 9px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+	.signout {
+		white-space: nowrap;
+	}
+	@media (max-width: 1120px) {
+		.topbar {
+			grid-template-columns: auto minmax(0, 1fr);
+			row-gap: 10px;
+		}
+		.topbar-actions {
+			grid-column: 2;
+			justify-content: flex-end;
+		}
+		.primary-nav {
+			grid-column: 1 / -1;
+			grid-row: 2;
+		}
+	}
+	@media (max-width: 640px) {
+		.topbar {
+			padding: 10px 14px;
+		}
+		.topbar-actions {
+			grid-column: 2;
+		}
+		.who small,
+		.signout span,
+		.primary-nav button span {
+			display: none;
+		}
+		.primary-nav button {
+			padding: 8px 10px;
+		}
 	}
 	.remote-banner {
 		display: flex;
