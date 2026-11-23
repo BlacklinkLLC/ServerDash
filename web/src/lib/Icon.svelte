@@ -1,42 +1,51 @@
 <script module>
-	// Blacklink's icon set, loaded once from its CDN at runtime so the
-	// dashboard always shows the current brand icons without a rebuild.
 	const ICONS_URL = 'https://cdn.blacklink.net/blacklink-icons.js';
-	let lib;
-	function loadLib() {
-		lib ??= import(/* @vite-ignore */ ICONS_URL).catch((e) => {
-			lib = undefined; // retry on next mount, e.g. after a network blip
-			throw e;
-		});
-		return lib;
+	let libPromise;
+
+	function loadIcons() {
+		libPromise ??= import(/* @vite-ignore */ ICONS_URL)
+			.then((m) => {
+				m.defineIconElement?.();
+				return m;
+			})
+			.catch((e) => {
+				libPromise = undefined;
+				throw e;
+			});
+		return libPromise;
 	}
 </script>
 
 <script>
-	// variant="mono" (default) inlines the SVG with fill=currentColor so it
-	// follows text color across themes; "color" keeps Blacklink's own paint.
 	let { name, size = 16, variant = 'mono', label = undefined } = $props();
-
-	let svg = $state('');
+	let ready = $state(false);
 
 	$effect(() => {
-		const n = name;
 		let cancelled = false;
-		loadLib()
-			.then((m) => (m.hasIcon(n) ? m.getInlineSvg(n, { variant, title: label }) : ''))
-			.then((markup) => {
-				if (!cancelled) svg = markup;
-			})
-			.catch(() => {
-				if (!cancelled) svg = '';
-			});
-		return () => (cancelled = true);
+		loadIcons().then(
+			() => {
+				if (!cancelled) ready = true;
+			},
+			() => {
+				if (!cancelled) ready = false;
+			},
+		);
+		return () => {
+			cancelled = true;
+		};
 	});
 </script>
 
-<span class="icon" style="width: {size}px; height: {size}px" aria-hidden={label ? undefined : 'true'}>
-	<!-- Markup comes from Blacklink's own CDN, the same origin as the script. -->
-	{@html svg}
+<span
+	class="icon"
+	style="width: {size}px; height: {size}px"
+	role={label ? 'img' : undefined}
+	aria-label={label}
+	aria-hidden={label ? undefined : 'true'}
+>
+	{#if ready}
+		<blacklink-icon {name} {variant} {size} label={label}></blacklink-icon>
+	{/if}
 </span>
 
 <style>
@@ -47,7 +56,8 @@
 		flex-shrink: 0;
 		line-height: 0;
 	}
-	.icon :global(svg) {
+	.icon :global(svg),
+	.icon :global(img) {
 		width: 100%;
 		height: 100%;
 	}

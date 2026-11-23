@@ -29,6 +29,8 @@ set -euo pipefail
 
 REPO_URL="${SERVERDASH_REPO_URL:-https://github.com/BlacklinkLLC/ServerDash.git}"
 UNIT_DIR="${SERVERDASH_UNIT_DIR:-/etc/systemd/system}"
+SELINUX_STATE="Disabled"
+SELINUX_ACTIVE=0
 
 RUNTIME=""
 RUNTIME_FLAG=0
@@ -513,6 +515,82 @@ stop_container_install() { # stop_container_install COMPOSE_CMD
 
 build_native() {
 	bash "$INSTALL_DIR/scripts/build-native.sh" "$INSTALL_DIR"
+}
+
+detect_selinux() {
+	SELINUX_STATE="$(getenforce 2>/dev/null || echo Disabled)"
+	case "$SELINUX_STATE" in
+		Enforcing|Permissive) SELINUX_ACTIVE=1 ;;
+		*) SELINUX_ACTIVE=0 ;;
+	esac
+}
+
+selinux_home_install() {
+	case "$INSTALL_DIR" in
+		/home/*|/root/*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+selinux_apply_types() {
+	selinux_home_install || return 0
+	local all bin exe ctx rc=0
+	all="$INSTALL_DIR(/.*)?"
+	bin="$INSTALL_DIR/bin(/.*)?"
+	exe="$INSTALL_DIR/bin/serverdash"
+	if command -v semanage >/dev/null 2>&1; then
+		semanage fcontext -a -t usr_t "$all" 2>/dev/null || semanage fcontext -m -t usr_t "$all" 2>/dev/null || rc=1
+		semanage fcontext -a -t bin_t "$bin" 2>/dev/null || semanage fcontext -m -t bin_t "$bin" 2>/dev/null || rc=1
+		semanage fcontext -a -t bin_t "$exe" 2>/dev/null || semanage fcontext -m -t bin_t "$exe" 2>/dev/null || rc=1
+		if [ "$rc" -eq 0 ]; then
+			restorecon -RF "$INSTALL_DIR"
+			ctx="$(stat -c '%C' "$INSTALL_DIR/.env" 2>/dev/null || true)"
+			case "$ctx" in
+				*user_home_t*|*container_file_t*) rc=1 ;;
+			esac
+			if [ "$rc" -eq 0 ]; then return 0; fi
+		fi
+	fi
+	warn "semanage rules unavailable; using chcon labels that a full relabel will reset"
+	chcon -R -t usr_t "$INSTALL_DIR"
+	if [ -d "$INSTALL_DIR/bin" ]; then
+		chcon -R -t bin_t "$INSTALL_DIR/bin"
+	fi
+}
+
+selinux_relabel() {
+	[ "$SELINUX_ACTIVE" -eq 1 ] || return 0
+	if ! command -v restorecon >/dev/null 2>&1; then
+		if [ "$SELINUX_STATE" = Enforcing ]; then
+			die "restorecon is required on an SELinux-enforcing host; install policycoreutils"
+		fi
+		warn "restorecon not found; skipping SELinux relabel"
+		return 0
+	fi
+	local parent ctx
+	parent="$(dirname "$INSTALL_DIR")"
+	if [ "$parent" != / ] && [ -d "$parent" ]; then
+		restorecon -F "$parent"
+	fi
+	restorecon -RF "$INSTALL_DIR"
+	selinux_apply_types
+	if [ -d "$NATIVE_DATA_DIR" ]; then
+		restorecon -F "$NATIVE_DATA_DIR"
+	fi
+	if [ -f "$INSTALL_DIR/.env" ]; then
+		ctx="$(stat -c '%C' "$INSTALL_DIR/.env" 2>/dev/null || true)"
+		case "$ctx" in
+			*user_home_t*|*container_file_t*)
+				warn "$INSTALL_DIR/.env is still labeled ${ctx:-unknown}; systemd may ignore it" ;;
+		esac
+	fi
+	if [ -f "$INSTALL_DIR/bin/serverdash" ]; then
+		ctx="$(stat -c '%C' "$INSTALL_DIR/bin/serverdash" 2>/dev/null || true)"
+		case "$ctx" in
+			*bin_t*) ;;
+			*) warn "unexpected SELinux context on $INSTALL_DIR/bin/serverdash: ${ctx:-unknown}" ;;
+		esac
+	fi
 }
 
 fetch_source() {
@@ -1453,6 +1531,7 @@ print_settings() {
 		"$(kv "Public host" "$PUBLIC_HOST" "$host_tag")" \
 		"$(kv "Port" "$PORT" "$port_tag")" \
 		"$(kv "Branch" "$BRANCH")" \
+		"$(kv "SELinux" "$([ "$SELINUX_ACTIVE" -eq 1 ] && echo "$SELINUX_STATE (labels restored on install)" || echo "disabled")")" \
 		"$(kv "Admin login" "$admin_text" "$admin_tag")" \
 		"$(kv "Service" "$([ "$START_SERVICE" -eq 1 ] && echo 'enable and start on boot' || echo 'install only, do not start')")"
 }
@@ -1595,9 +1674,10 @@ preflight() {
 	section "System"
 	ok "$os  ${DIM}$arch${RST}"
 	ok "Running as root, systemd available"
-	if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce 2>/dev/null)" = Enforcing ]; then
-		warn "SELinux is enforcing"
-		note "workflows and the Kubernetes mount need extra options, see the README"
+	detect_selinux
+	if [ "$SELINUX_ACTIVE" -eq 1 ]; then
+		warn "SELinux is $SELINUX_STATE; install paths will be relabeled for systemd"
+		note "workflows and the Kubernetes mount still need extra options, see the README"
 	fi
 }
 
@@ -1665,6 +1745,9 @@ install_all() {
 		run_step "Building the image (a few minutes the first time)" build_image
 	fi
 	run_step "Installing the systemd service" write_unit
+	if [ "$SELINUX_ACTIVE" -eq 1 ]; then
+		run_step "Restoring SELinux labels" selinux_relabel
+	fi
 	run_step "Installing the serverdash command" install_cli
 
 	if [ "$START_SERVICE" -eq 1 ]; then

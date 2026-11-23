@@ -187,7 +187,7 @@
 				<button class:active={page === 'plugins'} onclick={() => (page = 'plugins')}><Icon name="Puzzle" size={14} /> Plugins</button>
 			{/if}
 			{#if isAdmin && !target}
-				<button class:active={page === 'automations'} onclick={() => (page = 'automations')}><Icon name="Lightning" size={14} /> Automations</button>
+				<button class:active={page === 'automations'} onclick={() => (page = 'automations')}><Icon name="Bolt" size={14} /> Automations</button>
 				<button class:active={page === 'admin'} onclick={() => (page = 'admin')}><Icon name="Shield" size={14} /> Admin</button>
 			{/if}
 		</nav>
